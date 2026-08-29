@@ -25,23 +25,46 @@
 - **스마트 폴백 (Smart Fallback)**: 모션이 부족한 Live2D나 이미지가 1~3장뿐인 단순 도트 캐릭터를 넣어도 에러 없이 자동으로 상태를 대체하여 안전하게 구동
 
 ### 3. 방해 없는 미니멀 UI/UX & 마우스 제어
-- **완벽한 투명 마우스 클릭 관통 (Per-pixel Click-Through)**: 캐릭터 몸체만 클릭/드래그되고, 투명 배경은 뒤쪽 창(VS Code, 웹 브라우저)으로 100% 통과
+- **완벽한 투명 마우스 클릭 관통 (Per-pixel Click-Through)**: 캐릭터 몸체만 클릭/드래그되고, 투명 배경은 뒤쪽 작업 창(VS Code, 브라우저 등)으로 100% 통과
 - **마우스 휠(Wheel) 크기 조절**: 캐릭터 위에서 휠을 굴려 70% ~ 150%로 자유롭게 확대/축소 (창 크기 동적 연동으로 윗부분 모자 잘림 0%)
 - **마우스 우클릭 미니멀 메뉴**:
-  - 🔍 크기 조절 (80% / 100% / 120% / 140%)
+  - 🔍 크기 조절 프리셋 (80% / 100% / 120% / 140%)
   - 📌 항상 위에 고정 (ON / OFF 토글 - OFF 시 다른 작업 창 뒤로 자연스럽게 내려감)
   - 🔄 캐릭터 전환 (Mao ↔ 냥이)
   - ❌ 프로그램 안전 종료
 
 ---
 
+## 🛠️ 사전 요구사항 (Prerequisites)
+
+- **OS**: Windows 10/11 (WebView2 런타임 내장)
+- **Rust 환경**: Rust 1.77+ 및 Cargo ([rustup.rs](https://rustup.rs/))
+- **C++ 빌드 도구**: Visual Studio C++ Build Tools (MSVC)
+
+---
+
 ## 🚀 실행 방법
 
 ```bash
+# 1. 백엔드 디렉토리 이동
 cd src-tauri
+
+# 2. 실행
 cargo run
 ```
-*(또는 npm / cargo tauri dev)*
+*(또는 루트에서 `cargo tauri dev`)*
+
+---
+
+## 🎮 마우스 상호작용 가이드
+
+| 동작 | 인터랙션 기능 |
+| :--- | :--- |
+| **마우스 좌클릭 (탭)** | 캐릭터 윙크/손인사 리액션 (`click_react`) |
+| **마우스 좌클릭 + 드래그** | 화면 원하는 위치로 캐릭터 창 이동 |
+| **마우스 휠 위/아래** | 캐릭터 크기 실시간 축소 / 확대 (70% ~ 150%) |
+| **마우스 우클릭** | 미니멀 설정 메뉴 (크기 프리셋, 항상위 고정, 캐릭터 전환, 종료) |
+| **투명 영역 클릭** | 뒤쪽에 있는 작업 창(IDE, 브라우저)으로 100% 마우스 클릭 관통 |
 
 ---
 
@@ -73,9 +96,10 @@ cargo run
 
 ```
 ScreenMate/
-├── README.md                      # 프로젝트 소개 및 사용 가이드
-├── PROJECT_HISTORY.md             # 프로젝트 개발 히스토리 및 기술 맥락
-├── Implementation Plan.md         # 상세 구현 계획서
+├── README.md                      # 프로젝트 소개 및 사용자 가이드
+├── AGENTS.md                      # AI 에이전트 및 기여자를 위한 아키텍처 규약
+├── PROJECT_HISTORY.md             # 프로젝트 개발 히스토리 및 문제 해결 맥락
+├── IMPLEMENTATION_PLAN.md         # 상세 구현 계획서
 ├── src-tauri/                     # 백엔드 (Rust / Tauri v2)
 │   ├── Cargo.toml
 │   ├── tauri.conf.json            # 창 설정 (투명, 프레임리스, 항상위)
@@ -93,3 +117,11 @@ ScreenMate/
         ├── mao/                   # (4K Live2D Mao 모델 에셋 일체)
         └── pixel_cat/             # (2D 냥이 SVG 6종)
 ```
+
+---
+
+## 📜 라이선스 및 에셋 안내 (Notice)
+
+- **Mao Live2D Model**: 본 프로젝트에 포함된 Mao 캐릭터 모델은 Live2D 사의 공식 샘플 모델이며, [Live2D Free Material License](https://www.live2d.com/) 규정에 따라 비상업적 연구/학습/개발 용도로 사용됩니다.
+- **Live2D Cubism Core SDK**: Live2D Inc.의 공식 Web SDK CDN을 통해 로드됩니다.
+- **PixiJS**: MIT License
