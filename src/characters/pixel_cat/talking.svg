@@ -1,0 +1,26 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" width="200" height="220">
+  <g>
+    <!-- 귀 -->
+    <polygon points="35,70 15,10 75,45" fill="#f8b24f" stroke="#333" stroke-width="4" stroke-linejoin="round"/>
+    <polygon points="35,65 25,25 65,48" fill="#f68657"/>
+    <polygon points="165,70 185,10 125,45" fill="#f8b24f" stroke="#333" stroke-width="4" stroke-linejoin="round"/>
+    <polygon points="165,65 175,25 135,48" fill="#f68657"/>
+    <!-- 얼굴 -->
+    <ellipse cx="100" cy="120" rx="75" ry="65" fill="#ffd57e" stroke="#333" stroke-width="4"/>
+    <ellipse cx="55" cy="135" rx="14" ry="9" fill="#ff7777" opacity="0.8"/><ellipse cx="145" cy="135" rx="14" ry="9" fill="#ff7777" opacity="0.8"/>
+    <!-- 눈 -->
+    <path d="M 55 115 Q 65 105 75 115" fill="none" stroke="#333" stroke-width="4" stroke-linecap="round"/><path d="M 125 115 Q 135 105 145 115" fill="none" stroke="#333" stroke-width="4" stroke-linecap="round"/>
+    <!-- 코 -->
+    <polygon points="96,128 104,128 100,133" fill="#f68657"/>
+    <!-- 입 -->
+    <path d="M 90 136 Q 100 155 110 136 Z" fill="#ff7777" stroke="#333" stroke-width="3" stroke-linejoin="round"/>
+    <!-- 수염 -->
+    <line x1="30" y1="125" x2="10" y2="120" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+    <line x1="30" y1="135" x2="12" y2="140" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+    <line x1="170" y1="125" x2="190" y2="120" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+    <line x1="170" y1="135" x2="188" y2="140" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+    <text x="145" y="55" font-size="22">✨</text>
+    
+  </g>
+</svg>

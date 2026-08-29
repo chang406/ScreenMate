@@ -1,0 +1,172 @@
+{
+  "activeCharacter": "mao",
+  "characters": {
+    "mao": {
+      "name": "Mao (Live2D 4K)",
+      "type": "live2d",
+      "modelPath": "characters/mao/Mao.model3.json",
+      "reactions": {
+        "idle": {
+          "motionGroup": "Idle",
+          "motionIndex": [
+            0
+          ],
+          "expressions": [
+            null,
+            "exp_03"
+          ],
+          "subtitles": [
+            "대기 중이에요~",
+            "쉬는 중...",
+            "무엇이든 물어보세요!"
+          ]
+        },
+        "thinking": {
+          "motionGroup": "Think",
+          "motionIndex": [
+            0
+          ],
+          "expressions": [
+            "exp_01"
+          ],
+          "subtitles": [
+            "어디 보자...",
+            "생각 중이에요!",
+            "질문 분석 중..."
+          ]
+        },
+        "busy": {
+          "motionGroup": "Busy",
+          "motionIndex": [
+            0,
+            1
+          ],
+          "expressions": [
+            "exp_08"
+          ],
+          "subtitles": [
+            "열심히 코딩 중이에요! 🪄",
+            "명령어 실행 중...",
+            "파일 작성 중!"
+          ]
+        },
+        "talking": {
+          "motionGroup": "Talk",
+          "motionIndex": [
+            0,
+            1
+          ],
+          "expressions": [
+            "exp_06",
+            "exp_02",
+            "exp_03"
+          ],
+          "subtitles": [
+            "작업 완료! 확인해 주세요! ✨",
+            "쨘! 다 만들었어요!",
+            "결과 나왔어요! 어때요?"
+          ]
+        },
+        "error": {
+          "motionGroup": "Error",
+          "motionIndex": [
+            0
+          ],
+          "expressions": [
+            "exp_05"
+          ],
+          "subtitles": [
+            "어라? 에러가 발생했어요! 💦",
+            "문제가 생긴 것 같아요!",
+            "에러 확인 부탁드려요!"
+          ]
+        },
+        "click_react": {
+          "motionGroup": "Talk",
+          "motionIndex": [
+            0
+          ],
+          "expressions": [
+            "exp_02",
+            "exp_07",
+            "exp_03"
+          ],
+          "subtitles": [
+            "화이팅이에요! 힘내세요! 💕",
+            "오늘도 멋진 코딩 해봐요!",
+            "항상 응원하고 있어요! ✨"
+          ]
+        },
+        "sleeping": {
+          "motionGroup": "Idle",
+          "motionIndex": [
+            0
+          ],
+          "expressions": [
+            "exp_01"
+          ],
+          "subtitles": [
+            "Zzz... (새근새근)",
+            "(조는 중...)",
+            "쿨쿨... 💤"
+          ]
+        }
+      }
+    },
+    "pixel_cat": {
+      "name": "냥이 (2D Cat)",
+      "type": "image",
+      "states": {
+        "idle": {
+          "src": "characters/pixel_cat/idle.svg",
+          "subtitles": [
+            "(골골골...)",
+            "대기 중이다냥"
+          ]
+        },
+        "thinking": {
+          "src": "characters/pixel_cat/thinking.svg",
+          "subtitles": [
+            "(화면 집중 중)",
+            "계산 중이다냥..."
+          ]
+        },
+        "busy": {
+          "src": "characters/pixel_cat/busy.svg",
+          "subtitles": [
+            "타타탓! 코딩 중이다냥! ⚡",
+            "작업 폭풍 실행 중!"
+          ]
+        },
+        "talking": {
+          "src": "characters/pixel_cat/talking.svg",
+          "subtitles": [
+            "야옹! 완료했다냥! ✨",
+            "결과 나왔다냥!"
+          ]
+        },
+        "error": {
+          "src": "characters/pixel_cat/error.svg",
+          "subtitles": [
+            "하악! 에러가 났다냥! 🙀",
+            "빨간 불 떴다냥!"
+          ]
+        },
+        "click_react": {
+          "src": "characters/pixel_cat/touch.svg",
+          "subtitles": [
+            "골골골~ 기분 좋다냥! 💖",
+            "화이팅이다냥!"
+          ]
+        },
+        "sleeping": {
+          "src": "characters/pixel_cat/idle.svg",
+          "subtitles": [
+            "쿨쿨... 냥... 💤",
+            "(자는 중)"
+          ]
+        }
+      }
+    }
+  }
+}

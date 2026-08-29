@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>ScreenMate</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app-container">
+      <!-- 말풍선 대사 / 상태 표시 UI -->
+      <div id="speech-bubble" class="bubble-hidden">
+        <div id="bubble-text">대기 중이에요</div>
+      </div>
+
+      <!-- 캐릭터 컨테이너: Live2D Canvas와 2D Image를 모두 수용 -->
+      <div id="character-container">
+        <canvas id="live2d-canvas"></canvas>
+        <img id="image-character" class="hidden" alt="2D Character" />
+      </div>
+
+      <!-- 캐릭터 변경 미니 힌트 -->
+      <div id="char-hint">
+        <span id="char-name">Mao (Live2D)</span>
+        <button id="switch-btn" title="캐릭터 전환">🔄</button>
+      </div>
+
+      <!-- 우클릭 미니멀 팝업 메뉴 -->
+      <div id="context-menu" class="hidden">
+        <div class="menu-header">ScreenMate 🐾</div>
+        
+        <div class="menu-section">
+          <div class="menu-label">🔍 크기 조절 (휠 조절 가능)</div>
+          <div class="scale-presets">
+            <button class="scale-btn" data-scale="0.8">80%</button>
+            <button class="scale-btn" data-scale="1.0">100%</button>
+            <button class="scale-btn" data-scale="1.2">120%</button>
+            <button class="scale-btn" data-scale="1.4">140%</button>
+          </div>
+        </div>
+
+        <div class="menu-divider"></div>
+
+        <button id="toggle-top-btn" class="menu-item">
+          <span class="menu-icon">📌</span>
+          <span id="top-status-text">항상 위에 고정: ON</span>
+        </button>
+
+        <button id="menu-switch-char-btn" class="menu-item">
+          <span class="menu-icon">🔄</span>
+          <span>캐릭터 변경 (Mao / 냥이)</span>
+        </button>
+
+        <div class="menu-divider"></div>
+
+        <button id="menu-exit-btn" class="menu-item danger">
+          <span class="menu-icon">❌</span>
+          <span>종료</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Live2D 구동용 라이브러리 -->
+    <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.9/dist/browser/pixi.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
+
+    <script type="module" src="main.js"></script>
+  </body>
+</html>

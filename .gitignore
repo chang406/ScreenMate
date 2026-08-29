@@ -1,0 +1,25 @@
+# Rust / Cargo build outputs
+src-tauri/target/
+src-tauri/gen/
+
+# Node / Web dependencies & outputs (if applicable)
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE / Editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
