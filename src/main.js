@@ -361,16 +361,26 @@ listen("cursor-position", (event) => {
 });
 
 // 마우스 클릭 / 드래그 판정 변수
+let isMouseDown = false;
+let isDragging = false;
 let mouseDownX = 0;
 let mouseDownY = 0;
 let mouseDownTime = 0;
+let clickReactTimer = null;
+
+function triggerClickReact() {
+  renderState("click_react");
+
+  if (clickReactTimer) clearTimeout(clickReactTimer);
+  clickReactTimer = setTimeout(() => {
+    if (currentState === "click_react") {
+      renderState("idle");
+    }
+  }, 3500);
+}
 
 document.addEventListener("mousedown", (event) => {
   if (event.button === 0) {
-    mouseDownX = event.clientX;
-    mouseDownY = event.clientY;
-    mouseDownTime = Date.now();
-
     if (!contextMenu.contains(event.target)) {
       contextMenu.classList.add("hidden");
     }
@@ -379,24 +389,42 @@ document.addEventListener("mousedown", (event) => {
       return;
     }
 
-    appWindow.startDragging().catch((err) => {
-      console.error("startDragging failed:", err);
-    });
+    isMouseDown = true;
+    isDragging = false;
+    mouseDownX = event.screenX;
+    mouseDownY = event.screenY;
+    mouseDownTime = Date.now();
   }
 });
 
-// 클릭(탭) 인터랙션: 드래그가 아닌 제자리 클릭 시 터치 반응 트리거
+document.addEventListener("mousemove", (event) => {
+  if (isMouseDown && !isDragging) {
+    const dx = Math.abs(event.screenX - mouseDownX);
+    const dy = Math.abs(event.screenY - mouseDownY);
+
+    // 6px 이상 움직였을 때만 창 드래그 시작 (Windows DefWindowProc로 전환)
+    if (dx > 6 || dy > 6) {
+      isDragging = true;
+      isMouseDown = false;
+      appWindow.startDragging().catch((err) => {
+        console.error("startDragging failed:", err);
+      });
+    }
+  }
+});
+
+// 클릭(탭) 인터랙션: 드래그하지 않고 제자리에서 뗐을 때 터치 반응 실행
 document.addEventListener("mouseup", (event) => {
-  if (event.button === 0) {
-    const dx = Math.abs(event.clientX - mouseDownX);
-    const dy = Math.abs(event.clientY - mouseDownY);
+  if (event.button === 0 && isMouseDown) {
+    isMouseDown = false;
     const dt = Date.now() - mouseDownTime;
 
-    if (dx < 6 && dy < 6 && dt < 400) {
+    if (!isDragging && dt < 500) {
       if (event.target !== switchBtn && !contextMenu.contains(event.target)) {
-        renderState("click_react");
+        triggerClickReact();
       }
     }
+    isDragging = false;
   }
 });
 
