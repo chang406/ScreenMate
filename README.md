@@ -5,6 +5,15 @@
 
 ---
 
+## 🎬 실제 구동 데모 (AI 세션 실시간 동기화)
+
+| 1. 생각/분석 중 (`thinking`) | 2. 도구 실행 및 코딩 (`busy`) | 3. 작업 완료 및 보고 (`talking`) |
+| :---: | :---: | :---: |
+| <img src="docs/demo_thinking.png" width="100%" alt="Thinking" /> | <img src="docs/demo_busy.png" width="100%" alt="Busy" /> | <img src="docs/demo_talking.png" width="100%" alt="Talking" /> |
+| *"어디 보자... 질문 분석 중!"* | *"파일을 꼼꼼히 읽는 중... 🔍"* | *"쨘! 다 만들었어요! ✨"* |
+
+---
+
 ## 🌟 주요 기능
 
 ### 1. 다중 AI 에이전트 실시간 감시 (Multi-Agent Auto Watcher)
