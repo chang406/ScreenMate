@@ -1,7 +1,7 @@
 [package]
 name = "screen-mate"
 version = "0.1.0"
-description = "ScreenMate - Lightweight desktop screen mate overlay supporting Live2D and 2D characters reacting to Claude Code"
+description = "ScreenMate - Ultra-lightweight desktop screen mate overlay supporting Live2D and 2D characters reacting to Antigravity and Claude Code"
 authors = ["you"]
 edition = "2021"
 
