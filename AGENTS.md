@@ -77,7 +77,7 @@ cargo build --release
 
 ## 4. 캐릭터 추가 및 스키마 확장 가이드
 
-- **공개/기본 캐릭터**: `src/characters/<캐릭터명>/`에 배치합니다 (Mao, 냥이 등 라이선스 안전 에셋).
+- **공개/기본 캐릭터**: `src/characters/<캐릭터명>/`에 배치합니다 (Mao, Wanko, 냥이 등 라이선스 안전 에셋).
 - **개인 로컬 전용 커스텀 캐릭터 (Git 커밋 방지)**: `src/characters/custom_characters/<캐릭터명>/` 폴더에 배치합니다. 이 경로는 `.gitignore`로 보호되어 실수로 원격 저장소에 업로드되지 않습니다.
 - `src/characters.json`의 `characters` 객체에 새 키를 추가합니다.
 - 예시:

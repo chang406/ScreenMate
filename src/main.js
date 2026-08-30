@@ -294,15 +294,22 @@ async function switchCharacter(key) {
   showSubtitle(charDef.name + " 준비 완료!", 2500);
 }
 
-async function cycleNextCharacter() {
-  if (!config) return;
+async function switchRandomCharacter() {
+  if (!config || !config.characters) return;
   const keys = Object.keys(config.characters);
-  const nextIdx = (keys.indexOf(currentKey) + 1) % keys.length;
-  const nextKey = keys[nextIdx];
+  if (keys.length === 0) return;
+
+  let targetKey = keys[0];
+  if (keys.length > 1) {
+    const otherKeys = keys.filter((k) => k !== currentKey);
+    targetKey = otherKeys[Math.floor(Math.random() * otherKeys.length)];
+  }
+
   try {
-    await invoke("set_active_character", { id: nextKey });
+    await invoke("set_active_character", { id: targetKey });
   } catch (e) {
-    await switchCharacter(nextKey);
+    console.error("set_active_character failed:", e);
+    await switchCharacter(targetKey);
   }
 }
 
@@ -497,7 +504,7 @@ toggleTopBtn.addEventListener("click", (e) => {
 menuSwitchCharBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   contextMenu.classList.add("hidden");
-  cycleNextCharacter();
+  switchRandomCharacter();
 });
 
 menuSettingsBtn.addEventListener("click", (e) => {
@@ -513,7 +520,7 @@ menuExitBtn.addEventListener("click", (e) => {
 
 switchBtn.addEventListener("click", (e) => {
   e.stopPropagation();
-  cycleNextCharacter();
+  switchRandomCharacter();
 });
 
 window.addEventListener("resize", () => {

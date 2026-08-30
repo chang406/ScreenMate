@@ -113,7 +113,7 @@ async function loadGallery() {
 
     for (const [key, charDef] of Object.entries(characters)) {
       const isCurrentActive = key === activeKey;
-      const isPreset = key === "mao" || key === "pixel_cat";
+      const isPreset = key === "mao" || key === "pixel_cat" || key === "wanko";
 
       const card = document.createElement("div");
       card.className = isCurrentActive ? "char-card active" : "char-card";
@@ -121,7 +121,8 @@ async function loadGallery() {
       // Thumbnail
       let thumbHtml = "";
       if (charDef.type === "live2d") {
-        thumbHtml = `<div class="card-thumb"><span class="live2d-avatar">🪄</span></div>`;
+        const icon = key === "wanko" ? "🐶" : "🪄";
+        thumbHtml = `<div class="card-thumb"><span class="live2d-avatar">${icon}</span></div>`;
       } else {
         const firstSrc = charDef.states?.idle?.src || Object.values(charDef.states || {})[0]?.src || "";
         thumbHtml = `<div class="card-thumb"><img src="${firstSrc}" alt="${charDef.name}" /></div>`;
@@ -440,10 +441,24 @@ formLive2D.addEventListener("submit", async (e) => {
 });
 
 // ==========================================================================
-// Real-time Event Listener
+// Real-time Event Listener & Lifecycle Sync
 // ==========================================================================
 listen("characters-updated", () => {
   loadGallery();
+});
+
+listen("switch-character", () => {
+  loadGallery();
+});
+
+window.addEventListener("focus", () => {
+  loadGallery();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    loadGallery();
+  }
 });
 
 // Initial load

@@ -60,6 +60,7 @@ fn open_settings_window(app: AppHandle) -> Result<(), String> {
         settings_win.show().map_err(|e| e.to_string())?;
         settings_win.unminimize().map_err(|e| e.to_string())?;
         settings_win.set_focus().map_err(|e| e.to_string())?;
+        let _ = app.emit("characters-updated", ());
     } else {
         let _win = tauri::WebviewWindowBuilder::new(
             &app,
@@ -355,7 +356,7 @@ fn save_live2d_character(app: AppHandle, payload: SaveLive2DCharacterPayload) ->
 /// Deletes a custom character from characters.json and removes its directory.
 #[tauri::command]
 fn delete_custom_character(app: AppHandle, id: String) -> Result<(), String> {
-    if id == "mao" || id == "pixel_cat" {
+    if id == "mao" || id == "pixel_cat" || id == "wanko" {
         return Err("기본 프리셋 캐릭터는 삭제할 수 없습니다.".into());
     }
 
