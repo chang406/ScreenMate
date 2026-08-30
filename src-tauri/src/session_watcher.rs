@@ -28,6 +28,8 @@ pub enum AgentState {
 #[derive(Clone, Serialize)]
 struct StateChangePayload {
     state: AgentState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
 }
 
 fn watch_directories() -> Vec<PathBuf> {
@@ -82,91 +84,168 @@ fn find_latest_session_file(roots: &[PathBuf]) -> Option<PathBuf> {
     best.map(|(path, _)| path)
 }
 
-fn classify_record(record: &Value) -> Option<AgentState> {
-    // Check error status first
+fn tool_category(tool_name: &str) -> &'static str {
+    let lower = tool_name.to_lowercase();
+    if lower.contains("replace") || lower.contains("write") || lower.contains("edit") {
+        "edit"
+    } else if lower.contains("command") || lower.contains("bash") || lower.contains("terminal") || lower.contains("run") {
+        "command"
+    } else if lower.contains("view") || lower.contains("list") || lower.contains("read") || lower.contains("grep") || lower.contains("search") || lower.contains("find") {
+        "read"
+    } else if lower.contains("browser") || lower.contains("url") || lower.contains("web") {
+        "browse"
+    } else {
+        "general"
+    }
+}
+
+fn classify_record(record: &Value) -> Option<(AgentState, Option<String>)> {
+    // 1. Check error status first
     if let Some(status) = record.get("status").and_then(Value::as_str) {
         if status.eq_ignore_ascii_case("ERROR") || status.eq_ignore_ascii_case("FAILED") {
-            return Some(AgentState::Error);
+            return Some((AgentState::Error, None));
         }
     }
 
-    // 1. Antigravity format
+    // 2. Check Antigravity / Claude Code record types
     if let Some(record_type) = record.get("type").and_then(Value::as_str) {
         match record_type {
-            "USER_INPUT" => return Some(AgentState::Thinking),
-            "PLANNER_RESPONSE" => {
-                let has_tool_calls = record
-                    .get("tool_calls")
-                    .and_then(Value::as_array)
-                    .map(|arr| !arr.is_empty())
-                    .unwrap_or(false);
+            // User prompt input -> Thinking
+            "USER_INPUT" | "user" => return Some((AgentState::Thinking, None)),
 
-                if has_tool_calls {
-                    return Some(AgentState::Busy);
-                }
-
-                if let Some(content) = record.get("content").and_then(Value::as_str) {
-                    if !content.trim().is_empty() {
-                        return Some(AgentState::Talking);
-                    }
-                }
-
-                if record.get("thinking").is_some() {
-                    return Some(AgentState::Thinking);
-                }
-            }
-            "TOOL_CALL" | "LIST_DIRECTORY" | "VIEW_FILE" | "RUN_COMMAND" | "GREP_SEARCH" => {
-                return Some(AgentState::Busy);
-            }
-            // 2. Claude Code format
-            "user" => return Some(AgentState::Thinking),
-            "assistant" => {
-                let content = record.get("message")?.get("content")?;
-
-                if let Some(text) = content.as_str() {
-                    return if text.trim().is_empty() {
-                        None
-                    } else {
-                        Some(AgentState::Talking)
-                    };
-                }
-
-                if let Some(blocks) = content.as_array() {
-                    let has_tool_use = blocks
-                        .iter()
-                        .any(|b| b.get("type").and_then(Value::as_str) == Some("tool_use"));
-                    if has_tool_use {
-                        return Some(AgentState::Busy);
-                    }
-
-                    let has_text = blocks.iter().any(|b| {
-                        b.get("type").and_then(Value::as_str) == Some("text")
-                            && b.get("text")
-                                .and_then(Value::as_str)
-                                .map(|t| !t.trim().is_empty())
-                                .unwrap_or(false)
-                    });
-                    if has_text {
-                        return Some(AgentState::Talking);
-                    }
-                }
+            // System metadata to ignore
+            "CONVERSATION_HISTORY" | "KNOWLEDGE_ARTIFACTS" | "CHECKPOINT" | "SYSTEM" => {
                 return None;
             }
-            _ => {}
+
+            // Antigravity Model Planner Response
+            "PLANNER_RESPONSE" => {
+                let tool_calls = record
+                    .get("tool_calls")
+                    .and_then(Value::as_array);
+
+                if let Some(arr) = tool_calls {
+                    if !arr.is_empty() {
+                        let detail = arr
+                            .first()
+                            .and_then(|t| t.get("name").and_then(Value::as_str))
+                            .map(tool_category)
+                            .unwrap_or("general");
+                        return Some((AgentState::Busy, Some(detail.to_string())));
+                    }
+                }
+
+                // If no tool calls and non-empty content -> Final user response is delivered -> Talking
+                if let Some(content) = record.get("content").and_then(Value::as_str) {
+                    if !content.trim().is_empty() {
+                        return Some((AgentState::Talking, None));
+                    }
+                }
+
+                // If thinking block present without final text -> Thinking
+                if record.get("thinking").is_some() {
+                    return Some((AgentState::Thinking, None));
+                }
+
+                return Some((AgentState::Busy, Some("general".to_string())));
+            }
+
+            // Claude Code format
+            "assistant" => {
+                let message = record.get("message");
+                let stop_reason = message
+                    .and_then(|m| m.get("stop_reason"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+
+                let content = message
+                    .and_then(|m| m.get("content"))
+                    .or_else(|| record.get("content"));
+
+                if let Some(content) = content {
+                    if let Some(blocks) = content.as_array() {
+                        let tool_block = blocks.iter().find(|b| {
+                            b.get("type").and_then(Value::as_str) == Some("tool_use")
+                        });
+
+                        if let Some(tb) = tool_block {
+                            let tool_name = tb.get("name").and_then(Value::as_str).unwrap_or("");
+                            let detail = tool_category(tool_name);
+                            return Some((AgentState::Busy, Some(detail.to_string())));
+                        }
+
+                        let has_text = blocks.iter().any(|b| {
+                            b.get("type").and_then(Value::as_str) == Some("text")
+                                && b.get("text")
+                                    .and_then(Value::as_str)
+                                    .map(|t| !t.trim().is_empty())
+                                    .unwrap_or(false)
+                        });
+
+                        if has_text {
+                            return Some((AgentState::Talking, None));
+                        }
+
+                        let has_thinking = blocks.iter().any(|b| {
+                            b.get("type").and_then(Value::as_str) == Some("thinking")
+                        });
+                        if has_thinking {
+                            return Some((AgentState::Thinking, None));
+                        }
+                    } else if let Some(text) = content.as_str() {
+                        if !text.trim().is_empty() {
+                            return Some((AgentState::Talking, None));
+                        }
+                    }
+                }
+
+                if stop_reason == "tool_use" {
+                    return Some((AgentState::Busy, Some("general".to_string())));
+                }
+
+                return None;
+            }
+
+            // Specific tool execution/result types -> Busy with detail
+            "REPLACE_FILE_CONTENT" | "MULTI_REPLACE_FILE_CONTENT" | "WRITE_TO_FILE" => {
+                return Some((AgentState::Busy, Some("edit".to_string())));
+            }
+            "RUN_COMMAND" => {
+                return Some((AgentState::Busy, Some("command".to_string())));
+            }
+            "VIEW_FILE" | "LIST_DIRECTORY" | "GREP_SEARCH" | "SEARCH_WEB" => {
+                return Some((AgentState::Busy, Some("read".to_string())));
+            }
+            "READ_URL_CONTENT" | "BROWSER_SUBAGENT" => {
+                return Some((AgentState::Busy, Some("browse".to_string())));
+            }
+            "TOOL_CALL"
+            | "TOOL_RESULT"
+            | "tool_result"
+            | "progress"
+            | "GENERATE_IMAGE"
+            | "SCHEDULE"
+            | "MANAGE_TASK"
+            | "ASK_QUESTION" => {
+                return Some((AgentState::Busy, Some("general".to_string())));
+            }
+
+            // Fallback for any other type produced by the model -> Busy
+            _ => {
+                if let Some(source) = record.get("source").and_then(Value::as_str) {
+                    if source == "MODEL" {
+                        return Some((AgentState::Busy, Some("general".to_string())));
+                    }
+                }
+            }
         }
     }
 
+    // 3. Fallback on source if type was not matched
     if let Some(source) = record.get("source").and_then(Value::as_str) {
         match source {
-            "USER_EXPLICIT" => return Some(AgentState::Thinking),
-            "MODEL" => {
-                if let Some(content) = record.get("content").and_then(Value::as_str) {
-                    if !content.trim().is_empty() {
-                        return Some(AgentState::Talking);
-                    }
-                }
-                return Some(AgentState::Thinking);
-            }
+            "USER_EXPLICIT" => return Some((AgentState::Thinking, None)),
+            "MODEL" => return Some((AgentState::Busy, Some("general".to_string()))),
             _ => {}
         }
     }
@@ -250,15 +329,19 @@ pub async fn run(app: AppHandle) {
         }
 
         for record in tail.read_new_records() {
-            if let Some(new_state) = classify_record(&record) {
+            if let Some((new_state, detail)) = classify_record(&record) {
                 last_activity = Some(Instant::now());
-                if new_state != current_state {
+                if new_state != current_state || (new_state == AgentState::Busy && detail.is_some()) {
                     current_state = new_state;
-                    println!("[session_watcher] state -> {:?}", current_state);
+                    println!(
+                        "[session_watcher] state -> {:?}, detail -> {:?}",
+                        current_state, detail
+                    );
                     let _ = app.emit(
                         "state-change",
                         StateChangePayload {
                             state: current_state,
+                            detail,
                         },
                     );
                 }
@@ -274,6 +357,7 @@ pub async fn run(app: AppHandle) {
                     "state-change",
                     StateChangePayload {
                         state: current_state,
+                        detail: None,
                     },
                 );
             } else if elapsed > IDLE_TIMEOUT && elapsed <= SLEEP_TIMEOUT && current_state != AgentState::Idle && current_state != AgentState::Sleeping {
@@ -283,6 +367,7 @@ pub async fn run(app: AppHandle) {
                     "state-change",
                     StateChangePayload {
                         state: current_state,
+                        detail: None,
                     },
                 );
             }

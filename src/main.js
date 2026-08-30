@@ -29,7 +29,16 @@ let bubbleTimer = null;
 
 let stateLockUntil = 0;
 let pendingState = null;
+let pendingDetail = null;
 let pendingTimeout = null;
+
+let busyRefreshInterval = null;
+let lastBusySubtitleTime = 0;
+let currentBusyDetail = null;
+
+// Busy 모션 주기 (기본 10초 쿨다운)
+let busyMotionIntervalMs = parseInt(localStorage.getItem("screenmate_busy_motion_interval") || "10", 10) * 1000;
+let lastBusyMotionTime = 0;
 
 let currentScale = parseFloat(localStorage.getItem("screenmate_scale") || "1.0");
 let isAlwaysOnTop = localStorage.getItem("screenmate_always_on_top") !== "false";
@@ -196,7 +205,90 @@ function resolveFallbackState(charDef, state) {
   return firstKey ? { stateName: firstKey, def: dict[firstKey] } : null;
 }
 
-function apply2DImageState(charDef, state) {
+const CONTEXTUAL_BUSY_SUBTITLES = {
+  edit: [
+    "열심히 코딩 중이에요! 🪄",
+    "파일 작성 및 수정 중...",
+    "코드 꼼꼼히 작성 중! ✨",
+    "파일 변경 사항 반영 중..."
+  ],
+  command: [
+    "터미널 명령어 실행 중... 💻",
+    "명령어 실행 중...",
+    "빌드/실행 확인 중! ⚡"
+  ],
+  read: [
+    "파일을 꼼꼼히 읽는 중... 🔍",
+    "코드 구조 분석 중이에요!",
+    "파일 탐색 중... 📂",
+    "관련 문서 확인 중..."
+  ],
+  browse: [
+    "웹페이지 확인 중... 🌐",
+    "브라우저 탐색 중..."
+  ],
+  general: [
+    "열심히 작업 중이에요! 🪄",
+    "작업 진행 중...",
+    "잠시만 기다려 주세요!"
+  ]
+};
+
+function getBusySubtitle(charDef, detail) {
+  if (detail && CONTEXTUAL_BUSY_SUBTITLES[detail]) {
+    const list = CONTEXTUAL_BUSY_SUBTITLES[detail];
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  const resolved = resolveFallbackState(charDef, "busy");
+  const subList = resolved?.def?.subtitles;
+  if (subList && subList.length > 0) {
+    return subList[Math.floor(Math.random() * subList.length)];
+  }
+  return "열심히 작업 중이에요! 🪄";
+}
+
+function stopBusyRefresh() {
+  if (busyRefreshInterval) {
+    clearInterval(busyRefreshInterval);
+    busyRefreshInterval = null;
+  }
+}
+
+function startBusyRefresh() {
+  stopBusyRefresh();
+  busyRefreshInterval = setInterval(() => {
+    if (currentState === "busy") {
+      const charDef = config?.characters[currentKey];
+      if (charDef) {
+        // 1. 말풍선 대사 주기적 갱신
+        const sub = getBusySubtitle(charDef, currentBusyDetail);
+        showSubtitle(sub, 3500);
+        lastBusySubtitleTime = Date.now();
+
+        // 2. Busy 모션은 10초 주기가 지났을 때만 실행
+        const now = Date.now();
+        if (now - lastBusyMotionTime >= busyMotionIntervalMs) {
+          lastBusyMotionTime = now;
+          if (charDef.type === "live2d" && currentLive2DModel) {
+            const resolved = resolveFallbackState(charDef, "busy");
+            if (resolved?.def?.motionGroup) {
+              try {
+                const idx = Array.isArray(resolved.def.motionIndex)
+                  ? resolved.def.motionIndex[Math.floor(Math.random() * resolved.def.motionIndex.length)]
+                  : resolved.def.motionIndex ?? 0;
+                currentLive2DModel.motion(resolved.def.motionGroup, idx);
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } else {
+      stopBusyRefresh();
+    }
+  }, 5000);
+}
+
+function apply2DImageState(charDef, state, detail = null) {
   const resolved = resolveFallbackState(charDef, state);
   if (!resolved) return;
 
@@ -204,20 +296,30 @@ function apply2DImageState(charDef, state) {
   imgEl.src = stateDef.src;
   imgEl.className = "state-" + resolved.stateName;
 
-  if (stateDef.subtitles && stateDef.subtitles.length > 0) {
+  if (state === "busy") {
+    const sub = getBusySubtitle(charDef, detail);
+    showSubtitle(sub, 3500);
+  } else if (stateDef.subtitles && stateDef.subtitles.length > 0) {
     const randomSub = stateDef.subtitles[Math.floor(Math.random() * stateDef.subtitles.length)];
     showSubtitle(randomSub, state === "talking" ? 4500 : 3200);
   }
 }
 
-function applyLive2DState(charDef, state) {
+function applyLive2DState(charDef, state, detail = null) {
   if (!currentLive2DModel) return;
   const resolved = resolveFallbackState(charDef, state);
   if (!resolved) return;
 
   const reaction = resolved.def;
+  const now = Date.now();
 
-  if (reaction.motionGroup) {
+  // 모션 재생 판단: busy 상태일 때는 10초 쿨다운을 검사하고, 다른 상태(talking, click_react 등)는 즉시 재생
+  const shouldPlayMotion = (state !== "busy") || (now - lastBusyMotionTime >= busyMotionIntervalMs);
+
+  if (reaction.motionGroup && shouldPlayMotion) {
+    if (state === "busy") {
+      lastBusyMotionTime = now;
+    }
     const idx = Array.isArray(reaction.motionIndex)
       ? reaction.motionIndex[Math.floor(Math.random() * reaction.motionIndex.length)]
       : reaction.motionIndex ?? 0;
@@ -238,56 +340,123 @@ function applyLive2DState(charDef, state) {
     try { currentLive2DModel.expression(reaction.expression); } catch (e) {}
   }
 
-  if (reaction.subtitles && reaction.subtitles.length > 0) {
+  if (state === "busy") {
+    const sub = getBusySubtitle(charDef, detail);
+    showSubtitle(sub, 3500);
+  } else if (reaction.subtitles && reaction.subtitles.length > 0) {
     const randomSub = reaction.subtitles[Math.floor(Math.random() * reaction.subtitles.length)];
     showSubtitle(randomSub, state === "talking" ? 4500 : 3200);
   }
 }
 
-function renderState(state) {
+function renderState(state, force = false, detail = null) {
+  if (currentState === state && !force) {
+    return;
+  }
+  const prevState = currentState;
   currentState = state;
   const charDef = config?.characters[currentKey];
   if (!charDef) return;
 
-  console.log("[ScreenMate] state:", state);
-  if (charDef.type === "live2d") {
-    applyLive2DState(charDef, state);
+  if (state === "busy") {
+    if (prevState !== "busy") {
+      lastBusyMotionTime = 0; // busy 최초 진입 시 즉시 1회 모션 보장
+    }
+    currentBusyDetail = detail || currentBusyDetail || "general";
+    lastBusySubtitleTime = Date.now();
+    startBusyRefresh();
   } else {
-    apply2DImageState(charDef, state);
+    stopBusyRefresh();
+  }
+
+  console.log("[ScreenMate] state:", state, "detail:", detail);
+  if (charDef.type === "live2d") {
+    applyLive2DState(charDef, state, detail);
+  } else {
+    apply2DImageState(charDef, state, detail);
   }
 }
 
-function queueState(targetState) {
+function queueState(targetState, detail = null) {
   const now = Date.now();
 
-  if (targetState === "thinking" || targetState === "busy") {
+  // 이미 busy 상태에서 새로운 도구 이벤트(detail)가 들어왔을 때
+  if (targetState === "busy" && currentState === "busy") {
+    if (detail) {
+      currentBusyDetail = detail;
+    }
+    // 이전 말풍선이 뜬 지 3.5초 이상 지났다면 새로운 맞춤 대사로 부드럽게 갱신 (모션은 10초 쿨다운 유지)
+    if (now - lastBusySubtitleTime >= 3500) {
+      lastBusySubtitleTime = now;
+      const charDef = config?.characters[currentKey];
+      if (charDef) {
+        const sub = getBusySubtitle(charDef, currentBusyDetail);
+        showSubtitle(sub, 3500);
+        if (now - lastBusyMotionTime >= busyMotionIntervalMs) {
+          lastBusyMotionTime = now;
+          if (charDef.type === "live2d" && currentLive2DModel) {
+            const resolved = resolveFallbackState(charDef, "busy");
+            if (resolved?.def?.motionGroup) {
+              try {
+                const idx = Array.isArray(resolved.def.motionIndex)
+                  ? resolved.def.motionIndex[Math.floor(Math.random() * resolved.def.motionIndex.length)]
+                  : resolved.def.motionIndex ?? 0;
+                currentLive2DModel.motion(resolved.def.motionGroup, idx);
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  // 이미 해당 상태이고 대기 중인 상태 전환이 없으면 무시
+  if (targetState === currentState && !pendingState) {
+    return;
+  }
+
+  // thinking 상태 시작: 최소 1.5초간 생각 모션을 보장하도록 잠금
+  if (targetState === "thinking") {
     stateLockUntil = now + 1500;
     if (pendingTimeout) {
       clearTimeout(pendingTimeout);
       pendingTimeout = null;
     }
     pendingState = null;
-    renderState(targetState);
+    pendingDetail = null;
+    renderState(targetState, false, detail);
     return;
   }
 
+  // 아직 thinking 모션 보장 시간 내라면, 보장 종료 후 순차 전환되도록 대기열에 저장
   if (now < stateLockUntil) {
     pendingState = targetState;
+    pendingDetail = detail;
     if (!pendingTimeout) {
       const delay = stateLockUntil - now;
       pendingTimeout = setTimeout(() => {
         pendingTimeout = null;
         if (pendingState) {
-          const next = pendingState;
+          const nextState = pendingState;
+          const nextDetail = pendingDetail;
           pendingState = null;
-          renderState(next);
+          pendingDetail = null;
+          renderState(nextState, false, nextDetail);
         }
       }, delay);
     }
     return;
   }
 
-  renderState(targetState);
+  // 보장 시간이 지났다면 즉시 전환
+  if (pendingTimeout) {
+    clearTimeout(pendingTimeout);
+    pendingTimeout = null;
+  }
+  pendingState = null;
+  pendingDetail = null;
+  renderState(targetState, false, detail);
 }
 
 function fitModelToCanvas() {
@@ -383,7 +552,7 @@ async function loadLive2D(charDef) {
     pixiApp.stage.addChild(model);
     currentLive2DModel = model;
     fitModelToCanvas();
-    renderState(currentState);
+    renderState(currentState, true);
   } catch (err) {
     console.error("Live2D load failed:", err);
     showSubtitle("Live2D 로드 실패!");
@@ -400,7 +569,7 @@ function load2DImage(charDef) {
     currentLive2DModel = null;
   }
 
-  renderState(currentState);
+  renderState(currentState, true);
 }
 
 async function switchCharacter(key) {
@@ -510,7 +679,7 @@ let mouseDownTime = 0;
 let clickReactTimer = null;
 
 function triggerClickReact() {
-  renderState("click_react");
+  renderState("click_react", true);
 
   if (clickReactTimer) clearTimeout(clickReactTimer);
   clickReactTimer = setTimeout(() => {
@@ -656,8 +825,8 @@ window.addEventListener("resize", () => {
 });
 
 listen("state-change", (event) => {
-  console.log("[state-change event]", event.payload.state);
-  queueState(event.payload.state);
+  console.log("[state-change event]", event.payload.state, event.payload.detail);
+  queueState(event.payload.state, event.payload.detail);
 });
 
 async function reloadConfig() {
