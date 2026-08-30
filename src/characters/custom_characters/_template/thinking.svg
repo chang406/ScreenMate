@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="thinkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#b45309" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Card Background -->
+  <rect x="8" y="8" width="240" height="240" rx="24" fill="url(#thinkGrad)" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 4" stroke-opacity="0.8"/>
+
+  <!-- Icon (Bulb / Search) -->
+  <g transform="translate(128, 75)" text-anchor="middle">
+    <circle cx="0" cy="0" r="32" fill="#f59e0b" fill-opacity="0.15"/>
+    <!-- Lightbulb Icon -->
+    <path d="M-10 -4 C-14 -12 -8 -20 0 -20 C8 -20 14 -12 10 -4 C8 0 6 4 6 8 L-6 8 C-6 4 -8 0 -10 -4 Z" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M-5 13 L5 13" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M-3 17 L3 17" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+    <!-- Rays -->
+    <line x1="-18" y1="-18" x2="-14" y2="-14" stroke="#fde68a" stroke-width="2" stroke-linecap="round"/>
+    <line x1="18" y1="-18" x2="14" y2="-14" stroke="#fde68a" stroke-width="2" stroke-linecap="round"/>
+    <line x1="0" y1="-26" x2="0" y2="-22" stroke="#fde68a" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Badge -->
+  <rect x="68" y="125" width="120" height="22" rx="11" fill="#f59e0b" fill-opacity="0.9"/>
+  <text x="128" y="140" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="1">2. THINKING (생각)</text>
+
+  <!-- Guide Text -->
+  <text x="128" y="172" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#e2e8f0" text-anchor="middle">고민 / 집중 / 턱괴기</text>
+  <text x="128" y="192" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">질문 분석 중, 프롬프트 추론</text>
+
+  <!-- Resolution Tip -->
+  <text x="128" y="224" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">💡 권장: 256x256 이상 투명 PNG/SVG/GIF</text>
+</svg>

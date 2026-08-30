@@ -23,3 +23,10 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Custom user characters (Private/Local-only assets)
+src/characters/custom_characters/*
+!src/characters/custom_characters/.gitkeep
+!src/characters/custom_characters/README.md
+!src/characters/custom_characters/_template/
+!src/characters/custom_characters/_template/**

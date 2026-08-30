@@ -1,0 +1,27 @@
+{
+  "name": "나만의 캐릭터",
+  "type": "image",
+  "states": {
+    "idle": {
+      "src": "characters/custom_characters/my_char/idle.png",
+      "subtitles": [
+        "대기 중이에요~",
+        "무엇이든 물어보세요!"
+      ]
+    },
+    "thinking": {
+      "src": "characters/custom_characters/my_char/thinking.png",
+      "subtitles": [
+        "생각 중이에요...",
+        "분석하고 있어요!"
+      ]
+    },
+    "talking": {
+      "src": "characters/custom_characters/my_char/talking.png",
+      "subtitles": [
+        "작업 완료! 확인해 보세요! ✨",
+        "다 만들었어요!"
+      ]
+    }
+  }
+}

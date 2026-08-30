@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="idleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#1d4ed8" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Card Background -->
+  <rect x="8" y="8" width="240" height="240" rx="24" fill="url(#idleGrad)" stroke="#3b82f6" stroke-width="2" stroke-dasharray="6 4" stroke-opacity="0.8"/>
+
+  <!-- Icon (Cup / Rest) -->
+  <g transform="translate(128, 75)" text-anchor="middle">
+    <circle cx="0" cy="0" r="32" fill="#3b82f6" fill-opacity="0.15"/>
+    <!-- Teacup Icon -->
+    <path d="M-14 -6 L14 -6 L10 14 C10 18 -10 18 -10 14 Z" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M14 -2 C18 -2 20 2 20 5 C20 8 18 10 12 10" fill="none" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M-6 -12 C-6 -15 -4 -16 -4 -19" fill="none" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+    <path d="M2 -12 C2 -15 4 -16 4 -19" fill="none" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Badge -->
+  <rect x="78" y="125" width="100" height="22" rx="11" fill="#3b82f6" fill-opacity="0.9"/>
+  <text x="128" y="140" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" letter-spacing="1">1. IDLE (대기)</text>
+
+  <!-- Guide Text -->
+  <text x="128" y="172" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#e2e8f0" text-anchor="middle">편안한 기본 표정 / 호흡</text>
+  <text x="128" y="192" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">쉬는 중, 질문 대기 상태</text>
+
+  <!-- Resolution Tip -->
+  <text x="128" y="224" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">💡 권장: 256x256 이상 투명 PNG/SVG</text>
+</svg>

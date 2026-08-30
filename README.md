@@ -70,20 +70,73 @@ cargo run
 
 ## 🎨 새로운 캐릭터 추가 방법 (`src/characters.json`)
 
-`src/characters/` 폴더에 새 폴더를 만들고 이미지나 Live2D 모델을 넣은 뒤, `src/characters.json`에 등록하면 끝납니다!
+ScreenMate는 2D 이미지(PNG/GIF/SVG) 및 Live2D 모델을 손쉽게 추가할 수 있습니다.
+
+### 🛡️ 개인 커스텀 캐릭터 (Git 커밋 방지 & 템플릿 제공)
+개인적으로 좋아하는 게임/애니 캐릭터를 로컬에서만 사용하고 싶다면, **`src/characters/custom_characters/`** 폴더를 이용하세요!
+- **초간단 템플릿 제공**: `src/characters/custom_characters/_template/` 폴더를 복사하여 이미지 3장(`idle`, `thinking`, `talking`)만 넣으면 바로 완성됩니다.
+- **Git 자동 보호**: `custom_characters/*`의 개인 캐릭터 폴더는 `.gitignore`에 의해 **GitHub 원격 저장소에 절대 커밋/푸시되지 않습니다.**
+- 📖 **자세한 7대 상태 가이드 및 팁**: [custom_characters/README.md](src/characters/custom_characters/README.md) 참조
+
+---
+
+### 1️⃣ 2D 이미지 캐릭터 추가 예시
+
+`src/characters/custom_characters/_template`을 복사해 `my_bot` 폴더를 만들고 이미지를 넣은 뒤 `src/characters.json`에 추가:
 
 ```json
 {
-  "activeCharacter": "my_char",
+  "activeCharacter": "my_bot",
   "characters": {
-    "my_char": {
-      "name": "나만의 캐릭터",
+    "my_bot": {
+      "name": "나만의 도트 봇",
       "type": "image",
       "states": {
-        "idle": { "src": "characters/my_char/idle.png", "subtitles": ["대기 중"] },
-        "thinking": { "src": "characters/my_char/work.gif", "subtitles": ["작업 중!"] },
-        "talking": { "src": "characters/my_char/done.png", "subtitles": ["완료!"] }
-        // busy, error 등은 없으면 자동으로 thinking/talking/idle로 대체됨!
+        "idle": { "src": "characters/custom_characters/my_bot/idle.png", "subtitles": ["대기 중"] },
+        "thinking": { "src": "characters/custom_characters/my_bot/work.gif", "subtitles": ["작업 중!"] },
+        "talking": { "src": "characters/custom_characters/my_bot/done.png", "subtitles": ["완료!"] }
+        // busy, error, click_react 등 누락된 상태는 자동으로 thinking/talking/idle로 대체(스마트 폴백)됩니다.
+      }
+    }
+  }
+}
+```
+
+---
+
+### 2️⃣ Live2D 모델 추가 예시
+
+`src/characters/custom_characters/my_live2d/` 폴더에 Live2D 모델 에셋을 넣고 `src/characters.json`에 추가:
+
+```json
+{
+  "activeCharacter": "my_live2d",
+  "characters": {
+    "my_live2d": {
+      "name": "나만의 Live2D",
+      "type": "live2d",
+      "modelPath": "characters/custom_characters/my_live2d/model.model3.json",
+      "reactions": {
+        "idle": {
+          "motionGroup": "Idle",
+          "motionIndex": [0],
+          "subtitles": ["대기 중이에요~"]
+        },
+        "thinking": {
+          "motionGroup": "Think",
+          "motionIndex": [0],
+          "subtitles": ["생각 중..."]
+        },
+        "busy": {
+          "motionGroup": "Busy",
+          "motionIndex": [0],
+          "subtitles": ["작업 실행 중!"]
+        },
+        "talking": {
+          "motionGroup": "Talk",
+          "motionIndex": [0],
+          "subtitles": ["작업 완료! ✨"]
+        }
       }
     }
   }
@@ -115,7 +168,8 @@ ScreenMate/
     ├── characters.json            # 캐릭터 설정 및 대사/모션 매핑
     └── characters/                # 캐릭터 에셋
         ├── mao/                   # (4K Live2D Mao 모델 에셋 일체)
-        └── pixel_cat/             # (2D 냥이 SVG 6종)
+        ├── pixel_cat/             # (2D 냥이 SVG 6종)
+        └── custom_characters/     # (개인 로컬 전용 커스텀 캐릭터 - Git 제외)
 ```
 
 ---

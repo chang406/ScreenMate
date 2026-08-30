@@ -71,7 +71,8 @@ cargo build --release
 
 ## 4. 캐릭터 추가 및 스키마 확장 가이드
 
-- 새 캐릭터 에셋은 `src/characters/<캐릭터명>/` 폴더에 배치합니다.
+- **공개/기본 캐릭터**: `src/characters/<캐릭터명>/`에 배치합니다 (Mao, 냥이 등 라이선스 안전 에셋).
+- **개인 로컬 전용 커스텀 캐릭터 (Git 커밋 방지)**: `src/characters/custom_characters/<캐릭터명>/` 폴더에 배치합니다. 이 경로는 `.gitignore`로 보호되어 실수로 원격 저장소에 업로드되지 않습니다.
 - `src/characters.json`의 `characters` 객체에 새 키를 추가합니다.
 - 예시:
   ```json
@@ -79,9 +80,9 @@ cargo build --release
     "name": "나만의 도트 봇",
     "type": "image",
     "states": {
-      "idle": { "src": "characters/my_bot/idle.png", "subtitles": ["대기 중"] },
-      "thinking": { "src": "characters/my_bot/work.gif", "subtitles": ["작업 중!"] },
-      "talking": { "src": "characters/my_bot/done.png", "subtitles": ["완료!"] }
+      "idle": { "src": "characters/custom_characters/my_bot/idle.png", "subtitles": ["대기 중"] },
+      "thinking": { "src": "characters/custom_characters/my_bot/work.gif", "subtitles": ["작업 중!"] },
+      "talking": { "src": "characters/custom_characters/my_bot/done.png", "subtitles": ["완료!"] }
     }
   }
   ```
@@ -92,5 +93,6 @@ cargo build --release
 
 1. [ ] 백엔드 Rust 변경 시: `src-tauri`에서 `cargo check` 에러 0개 확인.
 2. [ ] 프론트엔드 변경 시: 마우스 클릭 관통 및 투명 배경이 정상 유지되는지 확인.
-3. [ ] 새 파일/설정 추가 시: 절대 경로(개인 PC 유저명 등) 및 민감한 API 키가 하드코딩되지 않았는지 확인.
-4. [ ] **Git 명령어 실행 원칙 (중요)**: `git add`, `git commit`, `git push`, `git reset` 등 Git 상태 변경이나 원격 저장소 푸시 명령어는 **AI 에이전트가 임의로 실행하지 않고, 반드시 사용자에게 먼저 확인을 받거나 사용자가 직접 실행하도록 명령어만 안내**할 것.
+3. [ ] **경로 표기 및 개인정보 보호 (중요)**: 마크다운(`README.md` 등) 및 코드 작성 시 개인 PC 절대 경로(`C:\Users\...`, `file:///...`)는 일절 사용을 금지하며, 반드시 **프로젝트 루트 기준의 상대 경로(Relative Path, 예: `src/...`)**만 작성할 것.
+4. [ ] 새 파일/설정 추가 시: 민감한 API 키나 개인 정보가 하드코딩되지 않았는지 확인.
+5. [ ] **Git 명령어 실행 원칙 (중요)**: `git add`, `git commit`, `git push`, `git reset` 등 Git 상태 변경이나 원격 저장소 푸시 명령어는 **AI 에이전트가 임의로 실행하지 않고, 반드시 사용자에게 먼저 확인을 받거나 사용자가 직접 실행하도록 명령어만 안내**할 것.
