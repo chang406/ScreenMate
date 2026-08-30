@@ -476,6 +476,15 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // Set window icon explicitly for taskbar and window headers
+            let icon = tauri::include_image!("icons/128x128.png");
+            if let Some(main_win) = app.get_webview_window("main") {
+                let _ = main_win.set_icon(icon.clone());
+            }
+            if let Some(settings_win) = app.get_webview_window("settings") {
+                let _ = settings_win.set_icon(icon);
+            }
+
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 session_watcher::run(app_handle).await;
