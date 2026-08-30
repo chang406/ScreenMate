@@ -164,9 +164,10 @@ ScreenMate는 **GUI 캐릭터 매니저**를 통해 코딩이나 JSON 수정 없
 ```
 ScreenMate/
 ├── README.md                      # 프로젝트 소개 및 사용자 가이드
+├── ROADMAP.md                     # 기능 개발 로드맵 & 아이디어 백로그
 ├── AGENTS.md                      # AI 에이전트 및 기여자를 위한 아키텍처 규약
 ├── PROJECT_HISTORY.md             # 프로젝트 개발 히스토리 및 문제 해결 맥락
-├── IMPLEMENTATION_PLAN.md         # 상세 구현 계획서
+├── docs/archive/                  # 완료된 과거 기획/구현 계획서 보관소
 ├── src-tauri/                     # 백엔드 (Rust / Tauri v2)
 │   ├── Cargo.toml
 │   ├── tauri.conf.json            # 창 설정 (투명, 프레임리스, 항상위)
