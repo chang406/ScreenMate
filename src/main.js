@@ -157,7 +157,6 @@ function updateBubblePosition(overrideSettings = null) {
 function showSubtitle(text, durationOverride = null, overrideSettings = null) {
   if (!text) return;
   const s = overrideSettings || getActiveBubbleSettings();
-  const duration = durationOverride ?? ((s.duration || 3.5) * 1000);
 
   bubbleText.textContent = text;
   speechBubble.classList.remove("bubble-hidden");
@@ -166,7 +165,17 @@ function showSubtitle(text, durationOverride = null, overrideSettings = null) {
     updateBubblePosition(s);
   });
   
-  if (bubbleTimer) clearTimeout(bubbleTimer);
+  if (bubbleTimer) {
+    clearTimeout(bubbleTimer);
+    bubbleTimer = null;
+  }
+
+  // durationOverride가 0이면(수면 모드 등) 자동으로 닫지 않고 계속 상시 유지
+  if (durationOverride === 0 || durationOverride === Infinity) {
+    return;
+  }
+
+  const duration = durationOverride ?? ((s.duration || 3.5) * 1000);
   bubbleTimer = setTimeout(() => {
     speechBubble.classList.add("bubble-hidden");
     if (overrideSettings) {
@@ -301,7 +310,8 @@ function apply2DImageState(charDef, state, detail = null) {
     showSubtitle(sub, 3500);
   } else if (stateDef.subtitles && stateDef.subtitles.length > 0) {
     const randomSub = stateDef.subtitles[Math.floor(Math.random() * stateDef.subtitles.length)];
-    showSubtitle(randomSub, state === "talking" ? 4500 : 3200);
+    const duration = state === "talking" ? 4500 : (state === "sleeping" ? 0 : 3200);
+    showSubtitle(randomSub, duration);
   }
 }
 
@@ -345,7 +355,8 @@ function applyLive2DState(charDef, state, detail = null) {
     showSubtitle(sub, 3500);
   } else if (reaction.subtitles && reaction.subtitles.length > 0) {
     const randomSub = reaction.subtitles[Math.floor(Math.random() * reaction.subtitles.length)];
-    showSubtitle(randomSub, state === "talking" ? 4500 : 3200);
+    const duration = state === "talking" ? 4500 : (state === "sleeping" ? 0 : 3200);
+    showSubtitle(randomSub, duration);
   }
 }
 
@@ -357,6 +368,17 @@ function renderState(state, force = false, detail = null) {
   currentState = state;
   const charDef = config?.characters[currentKey];
   if (!charDef) return;
+
+  if (prevState === "sleeping" && state !== "sleeping") {
+    // 수면 모드에서 벗어날 때 열려있던 상시 말풍선 닫기 처리
+    if (bubbleTimer) {
+      clearTimeout(bubbleTimer);
+      bubbleTimer = null;
+    }
+    if (state === "idle") {
+      speechBubble.classList.add("bubble-hidden");
+    }
+  }
 
   if (state === "busy") {
     if (prevState !== "busy") {
