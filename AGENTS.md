@@ -61,11 +61,17 @@ cargo build --release
 ### ③ 상태 큐잉 (State Queueing) & 최소 유지 시간
 - 짧은 명령어나 빠른 질문의 경우 `thinking` 상태가 0.1초 만에 `talking`으로 덮어써지는 문제를 방지하기 위해, `thinking` 발생 시 **최소 1.5초간 생각 모션을 보장**한 후 다음 상태(`talking` 등)로 전환하는 큐 스케줄링이 구현되어 있습니다.
 
-### ④ 마우스 휠 크기 조절 & 동적 윈도우 리사이즈
-- 캐릭터 확대 시(70% ~ 150%) 상단 마녀 모자나 장식물이 잘리지 않도록 배율에 맞춰 Tauri 윈도우 크기도 `invoke('set_window_size', { width, height })`를 통해 동적으로 함께 조절됩니다.
+### ④ 마우스 휠 크기 조절 & 캐릭터 내부 스케일링
+- 창 크기를 동적으로 변경할 때 발생하는 우클릭 메뉴 잘림 및 DPI 왜곡을 방지하기 위해, 투명 윈도우는 440x640으로 넉넉하게 고정하고 휠 조절 시 **캔버스 내부에서 캐릭터 모델 배율(70% ~ 150%)만 부드럽게 확대/축소**됩니다.
+- 캐릭터 크기 변화에 맞춰 마우스 클릭 감지 영역(`isOverCharacter`)도 정밀하게 자동 연동되어 투명 영역 클릭 관통이 100% 유지됩니다.
 
 ### ⑤ 스마트 폴백 (Smart Fallback)
 - `characters.json`에 새로운 2D 도트나 단순 Live2D 캐릭터를 등록할 때 특정 상태(예: `busy`, `error`)가 정의되어 있지 않더라도, `resolveFallbackState()` 함수를 통해 `thinking` -> `talking` -> `idle` 순으로 자동 대체되어 절대 런타임 오류가 발생하지 않습니다.
+
+### ⑥ GUI 캐릭터 매니저 및 멀티 윈도우 동기화
+- `tauri.conf.json`에 `settings` 윈도우를 `"visible": false`로 사전 선언(Pre-warmed)하여 앱 기동 시 백그라운드에서 초기화를 완료해 둡니다.
+- 우클릭 메뉴의 `open_settings_window`를 통해 0.001초 만에 `show()` 및 `set_focus()`로 팝업하며, 닫기(X) 시 `hide()`로 처리하여 빠른 재오픈을 보장합니다.
+- 설정 창에서 캐릭터 변경/추가/삭제 시 Rust 백엔드가 `characters-updated` 및 `switch-character` 이벤트를 메인 창으로 브로드캐스트하여 실시간 양방향 동기화.
 
 ---
 

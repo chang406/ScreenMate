@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>ScreenMate - 캐릭터 매니저</title>
+    <link rel="stylesheet" href="settings.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- 헤더 -->
+      <header class="header">
+        <div class="logo-area">
+          <span class="logo-icon">🐾</span>
+          <div>
+            <h1 class="title">캐릭터 매니저</h1>
+            <p class="subtitle">나만의 오버레이 캐릭터를 관리하고 추가하세요</p>
+          </div>
+        </div>
+        <div id="toast" class="toast hidden"></div>
+      </header>
+
+      <!-- 3단 탭 네비게이션 -->
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="gallery">
+          <span class="tab-icon">🎭</span>
+          <span>캐릭터 갤러리</span>
+        </button>
+        <button class="tab-btn" data-tab="add-2d">
+          <span class="tab-icon">🖼️</span>
+          <span>2D 이미지 추가</span>
+        </button>
+        <button class="tab-btn" data-tab="add-live2d">
+          <span class="tab-icon">🪄</span>
+          <span>Live2D 모델 추가</span>
+        </button>
+      </nav>
+
+      <!-- 탭 컨텐츠 영역 -->
+      <main class="tab-content">
+        <!-- 탭 1: 캐릭터 갤러리 -->
+        <section id="tab-gallery" class="tab-pane active">
+          <div class="section-header">
+            <h2 class="section-title">보유 중인 캐릭터 목록</h2>
+            <button id="refresh-gallery-btn" class="btn-secondary btn-sm">🔄 새로고침</button>
+          </div>
+          <div id="character-grid" class="character-grid">
+            <!-- 동적으로 생성되는 캐릭터 카드 목록 -->
+          </div>
+        </section>
+
+        <!-- 탭 2: 2D 이미지 캐릭터 추가 마법사 -->
+        <section id="tab-add-2d" class="tab-pane">
+          <form id="form-add-2d" class="form-container">
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="2d-id">캐릭터 식별 ID (영문/숫자)</label>
+                <input type="text" id="2d-id" class="input-text" placeholder="예: my_hero" required pattern="[a-zA-Z0-9_\-]+" />
+                <span class="input-hint">영문, 숫자, 언더바(_)만 가능 (폴더명으로 사용)</span>
+              </div>
+              <div class="form-group flex-1">
+                <label for="2d-name">표시 이름</label>
+                <input type="text" id="2d-name" class="input-text" placeholder="예: 슈퍼 마리오" required />
+              </div>
+            </div>
+
+            <!-- 1장 퀵 생성 토글 -->
+            <div class="quick-toggle-box">
+              <label class="toggle-switch">
+                <input type="checkbox" id="2d-quick-mode" />
+                <span class="slider"></span>
+              </label>
+              <div class="toggle-label-group">
+                <span class="toggle-title">⚡ 1장으로 빠른 생성 (원클릭 모드)</span>
+                <span class="toggle-desc">대기 이미지 1장만 등록하면 생각/완료 상태까지 자동으로 통일 적용합니다.</span>
+              </div>
+            </div>
+
+            <!-- 이미지 업로드 슬롯 3개 -->
+            <div class="slots-container">
+              <!-- 1. IDLE Slot -->
+              <div class="image-slot" data-slot="idle">
+                <div class="slot-header">
+                  <span class="slot-badge blue">1. 대기 (IDLE) *필수</span>
+                  <span class="slot-desc">평상시 기본 표정</span>
+                </div>
+                <div class="drop-zone" id="drop-idle">
+                  <input type="file" id="file-idle" accept="image/png,image/gif,image/svg+xml,image/webp,image/jpeg" class="file-input" required />
+                  <div class="drop-placeholder">
+                    <span class="drop-icon">📷</span>
+                    <span class="drop-text">클릭 또는 이미지 드래그</span>
+                    <span class="drop-subtext">PNG, GIF, SVG 권장</span>
+                  </div>
+                  <img id="preview-idle" class="preview-img hidden" alt="Idle 미리보기" />
+                </div>
+                <div class="subtitles-input-group">
+                  <input type="text" id="subs-idle" class="input-text-sm" placeholder="대사 (쉼표로 구분)" value="대기 중이에요~, 쉬는 중..." />
+                </div>
+              </div>
+
+              <!-- 2. THINKING Slot -->
+              <div class="image-slot" id="slot-thinking" data-slot="thinking">
+                <div class="slot-header">
+                  <span class="slot-badge amber">2. 생각 (THINKING)</span>
+                  <span class="slot-desc">고민/분석 중 표정</span>
+                </div>
+                <div class="drop-zone" id="drop-thinking">
+                  <input type="file" id="file-thinking" accept="image/png,image/gif,image/svg+xml,image/webp,image/jpeg" class="file-input" />
+                  <div class="drop-placeholder">
+                    <span class="drop-icon">🤔</span>
+                    <span class="drop-text">클릭 또는 이미지 드래그</span>
+                  </div>
+                  <img id="preview-thinking" class="preview-img hidden" alt="Thinking 미리보기" />
+                </div>
+                <div class="subtitles-input-group">
+                  <input type="text" id="subs-thinking" class="input-text-sm" placeholder="대사 (쉼표로 구분)" value="생각 중이에요..., 질문 분석 중!" />
+                </div>
+              </div>
+
+              <!-- 3. TALKING Slot -->
+              <div class="image-slot" id="slot-talking" data-slot="talking">
+                <div class="slot-header">
+                  <span class="slot-badge green">3. 완료 (TALKING)</span>
+                  <span class="slot-desc">기쁜 표정/작업 완료</span>
+                </div>
+                <div class="drop-zone" id="drop-talking">
+                  <input type="file" id="file-talking" accept="image/png,image/gif,image/svg+xml,image/webp,image/jpeg" class="file-input" />
+                  <div class="drop-placeholder">
+                    <span class="drop-icon">🎉</span>
+                    <span class="drop-text">클릭 또는 이미지 드래그</span>
+                  </div>
+                  <img id="preview-talking" class="preview-img hidden" alt="Talking 미리보기" />
+                </div>
+                <div class="subtitles-input-group">
+                  <input type="text" id="subs-talking" class="input-text-sm" placeholder="대사 (쉼표로 구분)" value="작업 완료! 확인해 보세요! ✨, 다 만들었어요!" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-save-2d" class="btn-primary">✨ 2D 캐릭터 생성 및 저장</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- 탭 3: Live2D 모델 추가 (스마트 자동 감지) -->
+        <section id="tab-add-live2d" class="tab-pane">
+          <form id="form-add-live2d" class="form-container">
+            <div class="info-alert">
+              <span class="alert-icon">💡</span>
+              <div class="alert-content">
+                <strong>스마트 자동 감지 (Auto-Detect)</strong>
+                <p>Live2D 모델이 들어있는 폴더 경로를 입력하시면, <code>.model3.json</code>을 자동 분석하여 7대 상태별 모션을 알아서 맞춰드립니다!</p>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="l2d-id">캐릭터 식별 ID (영문/숫자)</label>
+                <input type="text" id="l2d-id" class="input-text" placeholder="예: hiyori" required pattern="[a-zA-Z0-9_\-]+" />
+              </div>
+              <div class="form-group flex-1">
+                <label for="l2d-name">표시 이름</label>
+                <input type="text" id="l2d-name" class="input-text" placeholder="예: 히요리 (Live2D)" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="l2d-folder">Live2D 모델 폴더 경로</label>
+              <div class="input-action-group">
+                <input type="text" id="l2d-folder" class="input-text" placeholder="C:\Users\...\hiyori_free_model" required />
+                <button type="button" id="btn-analyze-l2d" class="btn-secondary">🔍 스마트 분석</button>
+              </div>
+              <span class="input-hint">*.model3.json 및 텍스처/모션 폴더가 있는 폴더의 절대 경로</span>
+            </div>
+
+            <!-- 분석 결과 매핑 박스 (초기엔 숨김) -->
+            <div id="l2d-mapping-section" class="mapping-box hidden">
+              <div class="mapping-header">
+                <span class="badge-success">✓ 모델 파일 감지: <strong id="detected-model-file">-</strong></span>
+                <span class="badge-neutral">감지된 모션 그룹: <strong id="detected-motion-count">0</strong>개</span>
+              </div>
+
+              <h4 class="mapping-title">상태별 모션 매핑 (자동 감지 완료 - 필요 시 변경 가능)</h4>
+              <div class="mapping-grid">
+                <div class="mapping-item">
+                  <span class="state-tag">1. 대기 (idle)</span>
+                  <select id="map-idle" class="select-box"></select>
+                </div>
+                <div class="mapping-item">
+                  <span class="state-tag">2. 생각 중 (thinking)</span>
+                  <select id="map-thinking" class="select-box"></select>
+                </div>
+                <div class="mapping-item">
+                  <span class="state-tag">3. 작업 중 (busy)</span>
+                  <select id="map-busy" class="select-box"></select>
+                </div>
+                <div class="mapping-item">
+                  <span class="state-tag">4. 작업 완료 (talking)</span>
+                  <select id="map-talking" class="select-box"></select>
+                </div>
+                <div class="mapping-item">
+                  <span class="state-tag">5. 에러 발생 (error)</span>
+                  <select id="map-error" class="select-box"></select>
+                </div>
+                <div class="mapping-item">
+                  <span class="state-tag">6. 터치 반응 (click_react)</span>
+                  <select id="map-click_react" class="select-box"></select>
+                </div>
+                <div class="mapping-item">
+                  <span class="state-tag">7. 수면 모드 (sleeping)</span>
+                  <select id="map-sleeping" class="select-box"></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-save-live2d" class="btn-primary" disabled>🪄 Live2D 캐릭터 등록 및 복사</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="settings.js"></script>
+  </body>
+</html>

@@ -10,9 +10,10 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "ScreenMate",
-        "width": 320,
-        "height": 500,
+        "width": 440,
+        "height": 640,
         "resizable": false,
         "transparent": true,
         "decorations": false,
@@ -20,6 +21,20 @@
         "shadow": false,
         "skipTaskbar": true,
         "center": false
+      },
+      {
+        "label": "settings",
+        "title": "ScreenMate - 캐릭터 매니저",
+        "url": "settings.html",
+        "width": 680,
+        "height": 640,
+        "minWidth": 580,
+        "minHeight": 500,
+        "resizable": true,
+        "decorations": true,
+        "alwaysOnTop": true,
+        "visible": false,
+        "center": true
       }
     ],
     "security": {

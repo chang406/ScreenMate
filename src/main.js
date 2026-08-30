@@ -14,6 +14,7 @@ const contextMenu = document.getElementById("context-menu");
 const toggleTopBtn = document.getElementById("toggle-top-btn");
 const topStatusText = document.getElementById("top-status-text");
 const menuSwitchCharBtn = document.getElementById("menu-switch-char-btn");
+const menuSettingsBtn = document.getElementById("menu-settings-btn");
 const menuExitBtn = document.getElementById("menu-exit-btn");
 const scaleBtns = document.querySelectorAll(".scale-btn");
 const characterContainer = document.getElementById("character-container");
@@ -32,9 +33,6 @@ let pendingTimeout = null;
 
 let currentScale = parseFloat(localStorage.getItem("screenmate_scale") || "1.0");
 let isAlwaysOnTop = localStorage.getItem("screenmate_always_on_top") !== "false";
-
-const BASE_WIDTH = 320;
-const BASE_HEIGHT = 520;
 
 function showSubtitle(text, duration = 3500) {
   if (!text) return;
@@ -171,22 +169,37 @@ function queueState(targetState) {
   renderState(targetState);
 }
 
+function fitModelToCanvas() {
+  if (!currentLive2DModel || !canvas) return;
+  const model = currentLive2DModel;
+  model.scale.set(1);
+  const naturalWidth = model.width || 500;
+  const naturalHeight = model.height || 600;
+
+  // 100% 기준 캐릭터 기본 비율 (창 440x640의 약 72% 차지)
+  const baseScale = Math.min(
+    (canvas.width * 0.72) / naturalWidth,
+    (canvas.height * 0.72) / naturalHeight
+  );
+
+  const finalScale = baseScale * currentScale;
+  model.scale.set(finalScale);
+  model.x = (canvas.width - naturalWidth * finalScale) / 2;
+  model.y = canvas.height - naturalHeight * finalScale - 16;
+}
+
 async function setScale(scale, notify = true) {
   currentScale = Math.min(Math.max(scale, 0.7), 1.5);
   localStorage.setItem("screenmate_scale", currentScale.toString());
 
-  const targetW = Math.round(BASE_WIDTH * currentScale);
-  const targetH = Math.round(BASE_HEIGHT * currentScale);
-
-  try {
-    await invoke("set_window_size", { width: targetW, height: targetH });
-  } catch (e) {
-    console.error("set_window_size failed:", e);
+  // 윈도우 창 크기는 440x640으로 넉넉하게 고정하고, 캐릭터 모델만 내부에서 배율 조절
+  if (currentLive2DModel) {
+    fitModelToCanvas();
   }
 
-  if (pixiApp) {
-    pixiApp.renderer.resize(window.innerWidth, window.innerHeight);
-    fitModelToCanvas();
+  if (imgEl) {
+    imgEl.style.transform = `scale(${currentScale})`;
+    imgEl.style.transformOrigin = "bottom center";
   }
 
   scaleBtns.forEach((btn) => {
@@ -219,22 +232,6 @@ async function toggleAlwaysOnTop() {
 function updateAlwaysOnTopUI() {
   topStatusText.textContent = isAlwaysOnTop ? "항상 위에 고정: ON" : "항상 위에 고정: OFF";
   toggleTopBtn.style.opacity = isAlwaysOnTop ? "1" : "0.7";
-}
-
-function fitModelToCanvas() {
-  if (!currentLive2DModel || !canvas) return;
-  const model = currentLive2DModel;
-  model.scale.set(1);
-  const naturalWidth = model.width || 500;
-  const naturalHeight = model.height || 600;
-
-  const scale = Math.min(
-    (canvas.width * 0.85) / naturalWidth,
-    (canvas.height * 0.72) / naturalHeight
-  );
-  model.scale.set(scale);
-  model.x = (canvas.width - naturalWidth * scale) / 2;
-  model.y = canvas.height - naturalHeight * scale - 12;
 }
 
 async function loadLive2D(charDef) {
@@ -297,11 +294,16 @@ async function switchCharacter(key) {
   showSubtitle(charDef.name + " 준비 완료!", 2500);
 }
 
-function cycleNextCharacter() {
+async function cycleNextCharacter() {
   if (!config) return;
   const keys = Object.keys(config.characters);
   const nextIdx = (keys.indexOf(currentKey) + 1) % keys.length;
-  switchCharacter(keys[nextIdx]);
+  const nextKey = keys[nextIdx];
+  try {
+    await invoke("set_active_character", { id: nextKey });
+  } catch (e) {
+    await switchCharacter(nextKey);
+  }
 }
 
 function isOverCharacter(x, y) {
@@ -321,13 +323,21 @@ function isOverCharacter(x, y) {
   if (!charDef) return false;
 
   if (charDef.type === "live2d" && currentLive2DModel) {
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    const left = w * 0.15;
-    const right = w * 0.85;
-    const top = h * 0.18;
-    const bottom = h * 0.98;
-    return x >= left && x <= right && y >= top && y <= bottom;
+    const naturalWidth = currentLive2DModel.width || 500;
+    const naturalHeight = currentLive2DModel.height || 600;
+    const baseScale = Math.min(
+      (canvas.width * 0.72) / naturalWidth,
+      (canvas.height * 0.72) / naturalHeight
+    );
+    const finalScale = baseScale * currentScale;
+    const charW = naturalWidth * finalScale;
+    const charH = naturalHeight * finalScale;
+
+    const charLeft = (canvas.clientWidth - charW) / 2 + charW * 0.12;
+    const charRight = (canvas.clientWidth + charW) / 2 - charW * 0.12;
+    const charTop = canvas.clientHeight - charH - 16 + charH * 0.12;
+    const charBottom = canvas.clientHeight - 16;
+    return x >= charLeft && x <= charRight && y >= charTop && y <= charBottom;
   } else {
     const rect = imgEl.getBoundingClientRect();
     return (
@@ -436,21 +446,40 @@ document.addEventListener("wheel", (e) => {
 
 document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
-  const menuWidth = 200;
-  const menuHeight = 180;
+  
+  // 1. 메뉴를 표시하고 위치 초기화
+  contextMenu.style.left = "0px";
+  contextMenu.style.top = "0px";
+  contextMenu.classList.remove("hidden");
+  
+  // 2. 정확한 렌더링 Bounding Rect 측정
+  const rect = contextMenu.getBoundingClientRect();
+  const menuWidth = rect.width > 0 ? rect.width : 220;
+  const menuHeight = rect.height > 0 ? rect.height : 265;
+  const winWidth = window.innerWidth;
+  const winHeight = window.innerHeight;
+
   let posX = e.clientX;
   let posY = e.clientY;
 
-  if (posX + menuWidth > window.innerWidth) {
-    posX = window.innerWidth - menuWidth - 10;
+  // 우측 화면 밖으로 벗어남 방지 (안전 여백 12px)
+  if (posX + menuWidth > winWidth - 12) {
+    posX = winWidth - menuWidth - 12;
   }
-  if (posY + menuHeight > window.innerHeight) {
-    posY = window.innerHeight - menuHeight - 10;
+  if (posX < 12) {
+    posX = 12;
   }
 
-  contextMenu.style.left = `${posX}px`;
-  contextMenu.style.top = `${posY}px`;
-  contextMenu.classList.remove("hidden");
+  // 하단 화면 밖으로 벗어남 방지 (안전 여백 12px)
+  if (posY + menuHeight > winHeight - 12) {
+    posY = winHeight - menuHeight - 12;
+  }
+  if (posY < 12) {
+    posY = 12;
+  }
+
+  contextMenu.style.left = `${Math.round(posX)}px`;
+  contextMenu.style.top = `${Math.round(posY)}px`;
 });
 
 scaleBtns.forEach((btn) => {
@@ -469,6 +498,12 @@ menuSwitchCharBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   contextMenu.classList.add("hidden");
   cycleNextCharacter();
+});
+
+menuSettingsBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  contextMenu.classList.add("hidden");
+  invoke("open_settings_window");
 });
 
 menuExitBtn.addEventListener("click", (e) => {
@@ -493,11 +528,33 @@ listen("state-change", (event) => {
   queueState(event.payload.state);
 });
 
+async function reloadConfig() {
+  try {
+    config = await invoke("get_character_configs");
+  } catch (e) {
+    console.error("reloadConfig failed:", e);
+  }
+}
+
+listen("characters-updated", async () => {
+  console.log("[characters-updated event]");
+  await reloadConfig();
+});
+
+listen("switch-character", async (event) => {
+  console.log("[switch-character event]", event.payload);
+  const targetKey = event.payload;
+  await reloadConfig();
+  if (targetKey && config?.characters[targetKey]) {
+    await switchCharacter(targetKey);
+  }
+});
+
 async function init() {
   try {
-    const res = await fetch("characters.json");
-    config = await res.json();
-    await switchCharacter(config.activeCharacter || "mao");
+    config = await invoke("get_character_configs");
+    const activeKey = config?.activeCharacter || "mao";
+    await switchCharacter(activeKey);
     setScale(currentScale, false);
     updateAlwaysOnTopUI();
   } catch (e) {
@@ -506,3 +563,4 @@ async function init() {
 }
 
 init();
+

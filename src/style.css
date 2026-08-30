@@ -149,18 +149,20 @@ canvas#live2d-canvas {
 /* 세련된 반투명 우클릭 미니멀 메뉴 */
 #context-menu {
   position: absolute;
-  width: 200px;
-  background: rgba(22, 22, 28, 0.95);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  width: 220px;
+  min-width: 220px;
+  background: rgba(18, 20, 28, 0.96);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
-  padding: 10px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   z-index: 300;
   pointer-events: auto;
+  box-sizing: border-box;
   animation: popup-scale 0.15s cubic-bezier(0, 0, 0.2, 1);
 }
 
