@@ -34,14 +34,135 @@ let pendingTimeout = null;
 let currentScale = parseFloat(localStorage.getItem("screenmate_scale") || "1.0");
 let isAlwaysOnTop = localStorage.getItem("screenmate_always_on_top") !== "false";
 
-function showSubtitle(text, duration = 3500) {
+// 말풍선 설정 계산 및 스타일 적용
+function getActiveBubbleSettings() {
+  const globalSettings = config?.globalBubbleSettings || {
+    autoTrack: true,
+    offsetY: 0,
+    duration: 3.5,
+    fontSize: 13,
+    bgColor: "#0f0f14",
+    bgOpacity: 0.92,
+    borderColor: "#404050",
+    borderRadius: 14,
+    hasTail: true
+  };
+
+  const charDef = config?.characters?.[currentKey];
+  const charSettings = charDef?.bubbleSettings;
+
+  if (charSettings && charSettings.useCustom) {
+    return {
+      autoTrack: charSettings.autoTrack ?? globalSettings.autoTrack,
+      offsetY: charSettings.offsetY ?? globalSettings.offsetY,
+      duration: charSettings.duration ?? globalSettings.duration,
+      fontSize: charSettings.fontSize ?? globalSettings.fontSize,
+      bgColor: charSettings.bgColor ?? globalSettings.bgColor,
+      bgOpacity: charSettings.bgOpacity ?? globalSettings.bgOpacity,
+      borderColor: charSettings.borderColor ?? globalSettings.borderColor,
+      borderRadius: charSettings.borderRadius ?? globalSettings.borderRadius,
+      hasTail: charSettings.hasTail ?? globalSettings.hasTail,
+    };
+  }
+
+  if (charSettings?.offsetY !== undefined && !charSettings.useCustom) {
+    return {
+      ...globalSettings,
+      offsetY: charSettings.offsetY,
+    };
+  }
+
+  return globalSettings;
+}
+
+function hexToRgba(hex, alpha = 1) {
+  if (!hex) return `rgba(15, 15, 20, ${alpha})`;
+  let c = hex.replace("#", "");
+  if (c.length === 3) c = c.split("").map((x) => x + x).join("");
+  if (c.length !== 6) return hex;
+  const num = parseInt(c, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function applyBubbleStyles(overrideSettings = null) {
+  if (!speechBubble) return;
+  const s = overrideSettings || getActiveBubbleSettings();
+
+  const bgRgba = hexToRgba(s.bgColor, s.bgOpacity ?? 0.92);
+  const borderColor = s.borderColor || "rgba(255, 255, 255, 0.25)";
+
+  speechBubble.style.setProperty("--bubble-bg", bgRgba);
+  speechBubble.style.setProperty("--bubble-font-size", `${s.fontSize || 13}px`);
+  speechBubble.style.setProperty("--bubble-radius", `${s.borderRadius || 14}px`);
+  speechBubble.style.setProperty("--bubble-border", `1.5px solid ${borderColor}`);
+  speechBubble.style.setProperty("--bubble-tail-color", bgRgba);
+  speechBubble.style.setProperty("--bubble-tail-display", s.hasTail !== false ? "block" : "none");
+
+  updateBubblePosition(s);
+}
+
+function updateBubblePosition(overrideSettings = null) {
+  if (!speechBubble) return;
+  const s = overrideSettings || getActiveBubbleSettings();
+  const offsetY = s.offsetY || 0;
+
+  // 자동 밀착 추적이 비활성화된 경우 고정 20px (+ 오프셋)
+  if (!s.autoTrack) {
+    const fixedTop = Math.max(2, 20 - offsetY);
+    speechBubble.style.setProperty("--bubble-top", `${fixedTop}px`);
+    return;
+  }
+
+  const charDef = config?.characters?.[currentKey];
+  let characterTopY = 0;
+
+  if (charDef?.type === "live2d" && currentLive2DModel) {
+    try {
+      const bounds = currentLive2DModel.getBounds();
+      characterTopY = bounds.y;
+    } catch (_) {
+      characterTopY = currentLive2DModel.y || 120;
+    }
+  } else if (imgEl && !imgEl.classList.contains("hidden")) {
+    const rect = imgEl.getBoundingClientRect();
+    characterTopY = rect.top;
+  } else {
+    characterTopY = 120;
+  }
+
+  const bubbleHeight = speechBubble.offsetHeight || 42;
+  const gap = 12; // 말풍선 꼬리와 머리 사이의 기본 간격
+  
+  // 양수(+ / 오른쪽): 위로 더 올라감 (-offsetY)
+  // 음수(- / 왼쪽): 머리 쪽으로 더 내려옴 (+ |offsetY|)
+  const desiredTop = characterTopY - bubbleHeight - gap - offsetY;
+
+  // 상단 화면(2px)을 벗어나지 않도록 클램핑
+  const safeTop = Math.max(2, Math.round(desiredTop));
+  speechBubble.style.setProperty("--bubble-top", `${safeTop}px`);
+}
+
+function showSubtitle(text, durationOverride = null, overrideSettings = null) {
   if (!text) return;
+  const s = overrideSettings || getActiveBubbleSettings();
+  const duration = durationOverride ?? ((s.duration || 3.5) * 1000);
+
   bubbleText.textContent = text;
   speechBubble.classList.remove("bubble-hidden");
+  
+  requestAnimationFrame(() => {
+    updateBubblePosition(s);
+  });
   
   if (bubbleTimer) clearTimeout(bubbleTimer);
   bubbleTimer = setTimeout(() => {
     speechBubble.classList.add("bubble-hidden");
+    if (overrideSettings) {
+      applyBubbleStyles();
+    }
   }, duration);
 }
 
@@ -202,6 +323,8 @@ async function setScale(scale, notify = true) {
     imgEl.style.transformOrigin = "bottom center";
   }
 
+  updateBubblePosition();
+
   scaleBtns.forEach((btn) => {
     const val = parseFloat(btn.dataset.scale);
     if (Math.abs(val - currentScale) < 0.05) {
@@ -291,6 +414,7 @@ async function switchCharacter(key) {
   } else {
     load2DImage(charDef);
   }
+  applyBubbleStyles();
   showSubtitle(charDef.name + " 준비 완료!", 2500);
 }
 
@@ -527,6 +651,7 @@ window.addEventListener("resize", () => {
   if (pixiApp) {
     pixiApp.renderer.resize(window.innerWidth, window.innerHeight);
     fitModelToCanvas();
+    updateBubblePosition();
   }
 });
 
@@ -546,6 +671,24 @@ async function reloadConfig() {
 listen("characters-updated", async () => {
   console.log("[characters-updated event]");
   await reloadConfig();
+  applyBubbleStyles();
+});
+
+listen("bubble-settings-updated", async () => {
+  console.log("[bubble-settings-updated event]");
+  await reloadConfig();
+  applyBubbleStyles();
+});
+
+listen("test-bubble", (event) => {
+  console.log("[test-bubble event]", event.payload);
+  const data = event.payload || {};
+  const text = (typeof data === "string" ? data : data.text) || "💬 말풍선 미리보기 테스트입니다! ✨";
+  const customSettings = (typeof data === "object" && data.settings) ? data.settings : null;
+
+  applyBubbleStyles(customSettings);
+  const durationMs = customSettings?.duration ? Math.round(customSettings.duration * 1000) : 3500;
+  showSubtitle(text, durationMs, customSettings);
 });
 
 listen("switch-character", async (event) => {
@@ -564,6 +707,7 @@ async function init() {
     await switchCharacter(activeKey);
     setScale(currentScale, false);
     updateAlwaysOnTopUI();
+    applyBubbleStyles();
   } catch (e) {
     console.error("Init failed:", e);
   }

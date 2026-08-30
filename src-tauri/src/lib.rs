@@ -72,7 +72,7 @@ fn open_settings_window(app: AppHandle) -> Result<(), String> {
         .min_inner_size(580.0, 500.0)
         .resizable(true)
         .decorations(true)
-        .always_on_top(true)
+        .always_on_top(false)
         .build()
         .map_err(|e| e.to_string())?;
     }
@@ -396,6 +396,60 @@ fn delete_custom_character(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SaveBubbleSettingsPayload {
+    pub target_id: Option<String>,
+    pub settings: Value,
+}
+
+/// Saves global or character-specific speech bubble settings to characters.json.
+#[tauri::command]
+fn save_bubble_settings(app: AppHandle, payload: SaveBubbleSettingsPayload) -> Result<(), String> {
+    let src_dir = get_src_dir()?;
+    let json_path = src_dir.join("characters.json");
+    let content = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
+    let mut val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+
+    if let Some(target) = payload.target_id.as_deref() {
+        if target == "global" {
+            if let Some(obj) = val.as_object_mut() {
+                obj.insert("globalBubbleSettings".to_string(), payload.settings);
+            }
+        } else if let Some(chars) = val.get_mut("characters").and_then(|c| c.as_object_mut()) {
+            if let Some(char_def) = chars.get_mut(target).and_then(|cd| cd.as_object_mut()) {
+                char_def.insert("bubbleSettings".to_string(), payload.settings);
+            }
+        }
+    } else if let Some(obj) = val.as_object_mut() {
+        obj.insert("globalBubbleSettings".to_string(), payload.settings);
+    }
+
+    let updated_json = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
+    fs::write(&json_path, updated_json).map_err(|e| e.to_string())?;
+
+    let _ = app.emit("bubble-settings-updated", ());
+    let _ = app.emit("characters-updated", ());
+
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TestBubblePayload {
+    pub text: Option<String>,
+    pub settings: Option<Value>,
+}
+
+/// Triggers a live test speech bubble on the overlay window.
+#[tauri::command]
+fn trigger_test_bubble(app: AppHandle, payload: Option<TestBubblePayload>) -> Result<(), String> {
+    let p = payload.unwrap_or(TestBubblePayload {
+        text: Some("말풍선 미리보기 테스트입니다! ✨".into()),
+        settings: None,
+    });
+    let _ = app.emit("test-bubble", p);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -409,7 +463,9 @@ pub fn run() {
             save_2d_character,
             parse_live2d_folder,
             save_live2d_character,
-            delete_custom_character
+            delete_custom_character,
+            save_bubble_settings,
+            trigger_test_bubble
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

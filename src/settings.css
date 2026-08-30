@@ -730,3 +730,211 @@ input:checked + .slider:before {
   background: rgba(239, 68, 68, 0.3);
   color: #ffffff;
 }
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ==========================================================================
+   Tab 4: Speech Bubble Settings Styling
+   ========================================================================== */
+
+.bubble-settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bubble-header-card {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.bubble-preview-box {
+  background: radial-gradient(circle at center, rgba(30, 58, 138, 0.2) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.bubble-preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 12px;
+  align-self: flex-start;
+}
+
+.preview-bubble-stage {
+  padding: 36px 20px 36px 20px;
+  min-height: 120px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.mock-speech-bubble {
+  position: relative;
+  max-width: 90%;
+  padding: 10px 18px;
+  background: rgba(15, 15, 20, 0.92);
+  backdrop-filter: blur(12px);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  transition: transform 0.15s ease-out, background 0.2s ease, border-color 0.2s ease;
+}
+
+.mock-speech-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  margin-left: -8px;
+  border-width: 8px 8px 0;
+  border-style: solid;
+  border-color: rgba(15, 15, 20, 0.92) transparent;
+  display: block;
+  width: 0;
+}
+
+.settings-group-card {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.group-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.slider-header label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.slider-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  background: rgba(59, 130, 246, 0.15);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: static;
+  margin: 6px 0;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--primary);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s ease, background 0.2s ease;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: var(--primary-hover);
+}
+
+.color-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-input {
+  -webkit-appearance: none;
+  border: none;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-input::-webkit-color-swatch {
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.space-between {
+  justify-content: space-between;
+}
+
+.action-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}

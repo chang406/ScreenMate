@@ -32,7 +32,7 @@
         "minHeight": 500,
         "resizable": true,
         "decorations": true,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "visible": false,
         "center": true
       }

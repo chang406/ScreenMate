@@ -93,6 +93,8 @@ function switchTab(tabId) {
 
   if (tabId === "gallery") {
     loadGallery();
+  } else if (tabId === "bubble") {
+    loadBubbleSettingsTab();
   }
 }
 
@@ -441,23 +443,330 @@ formLive2D.addEventListener("submit", async (e) => {
 });
 
 // ==========================================================================
+// Tab 4: Speech Bubble Settings
+// ==========================================================================
+const bubbleTargetSelect = document.getElementById("bubble-target-select");
+const bubbleCustomToggleGroup = document.getElementById("bubble-custom-toggle-group");
+const bubbleUseCustom = document.getElementById("bubble-use-custom");
+const mockBubble = document.getElementById("mock-bubble");
+
+const formBubble = document.getElementById("form-bubble-settings");
+const bubbleAutoTrack = document.getElementById("bubble-auto-track");
+const bubbleOffsetY = document.getElementById("bubble-offset-y");
+const valBubbleOffsetY = document.getElementById("val-bubble-offset-y");
+const bubbleDuration = document.getElementById("bubble-duration");
+const valBubbleDuration = document.getElementById("val-bubble-duration");
+const bubbleFontSize = document.getElementById("bubble-font-size");
+const valBubbleFontSize = document.getElementById("val-bubble-font-size");
+const bubbleBgColor = document.getElementById("bubble-bg-color");
+const bubbleBgColorText = document.getElementById("bubble-bg-color-text");
+const bubbleBgOpacity = document.getElementById("bubble-bg-opacity");
+const valBubbleBgOpacity = document.getElementById("val-bubble-bg-opacity");
+const bubbleBorderColor = document.getElementById("bubble-border-color");
+const bubbleBorderColorText = document.getElementById("bubble-border-color-text");
+const bubbleBorderRadius = document.getElementById("bubble-border-radius");
+const valBubbleBorderRadius = document.getElementById("val-bubble-border-radius");
+const bubbleHasTail = document.getElementById("bubble-has-tail");
+
+const btnTestBubble = document.getElementById("btn-test-bubble");
+const btnResetBubble = document.getElementById("btn-reset-bubble");
+
+let cachedBubbleConfig = null;
+
+function hexToRgba(hex, alpha = 1) {
+  if (!hex) return `rgba(15, 15, 20, ${alpha})`;
+  let c = hex.replace("#", "");
+  if (c.length === 3) c = c.split("").map((x) => x + x).join("");
+  if (c.length !== 6) return hex;
+  const num = parseInt(c, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function updateMockBubble() {
+  if (!mockBubble) return;
+
+  const bgRgba = hexToRgba(bubbleBgColor.value, parseFloat(bubbleBgOpacity.value));
+  const borderColor = bubbleBorderColor.value || "rgba(255, 255, 255, 0.25)";
+  const fontSize = `${bubbleFontSize.value}px`;
+  const radius = `${bubbleBorderRadius.value}px`;
+  const hasTail = bubbleHasTail.checked;
+  const offsetY = parseInt(bubbleOffsetY.value, 10) || 0;
+
+  mockBubble.style.background = bgRgba;
+  mockBubble.style.borderColor = borderColor;
+  mockBubble.style.fontSize = fontSize;
+  mockBubble.style.borderRadius = radius;
+  mockBubble.style.transform = `translateY(${-offsetY}px)`;
+
+  let tailStyle = document.getElementById("mock-tail-dynamic-style");
+  if (!tailStyle) {
+    tailStyle = document.createElement("style");
+    tailStyle.id = "mock-tail-dynamic-style";
+    document.head.appendChild(tailStyle);
+  }
+  tailStyle.textContent = `
+    #mock-bubble::after {
+      border-color: ${bgRgba} transparent !important;
+      display: ${hasTail ? "block" : "none"} !important;
+    }
+  `;
+}
+
+function syncSliderLabels() {
+  const offY = parseInt(bubbleOffsetY.value, 10) || 0;
+  valBubbleOffsetY.textContent = offY > 0 ? `+${offY}px (위로)` : (offY < 0 ? `${offY}px (아래로)` : "0px (기본)");
+  valBubbleDuration.textContent = `${parseFloat(bubbleDuration.value).toFixed(1)}초`;
+  valBubbleFontSize.textContent = `${bubbleFontSize.value}px`;
+  valBubbleBgOpacity.textContent = `${Math.round(parseFloat(bubbleBgOpacity.value) * 100)}%`;
+  valBubbleBorderRadius.textContent = `${bubbleBorderRadius.value}px`;
+}
+
+async function loadBubbleSettingsTab() {
+  try {
+    cachedBubbleConfig = await invoke("get_character_configs");
+    const characters = cachedBubbleConfig.characters || {};
+    const activeKey = cachedBubbleConfig.activeCharacter;
+
+    const prevSelected = bubbleTargetSelect.value || "global";
+    bubbleTargetSelect.innerHTML = `<option value="global">🌐 전역 기본값 (모든 캐릭터 공통)</option>`;
+
+    for (const [key, charDef] of Object.entries(characters)) {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = `👤 ${charDef.name || key}${key === activeKey ? " (현재 사용 중)" : ""}`;
+      bubbleTargetSelect.appendChild(opt);
+    }
+
+    if (characters[prevSelected] || prevSelected === "global") {
+      bubbleTargetSelect.value = prevSelected;
+    } else {
+      bubbleTargetSelect.value = "global";
+    }
+
+    loadBubbleTargetSettings(bubbleTargetSelect.value);
+  } catch (err) {
+    console.error("loadBubbleSettingsTab failed:", err);
+  }
+}
+
+const FACTORY_DEFAULT_BUBBLE_SETTINGS = {
+  autoTrack: true,
+  offsetY: 0,
+  duration: 3.5,
+  fontSize: 13,
+  bgColor: "#0f0f14",
+  bgOpacity: 0.92,
+  borderColor: "#404050",
+  borderRadius: 14,
+  hasTail: true,
+};
+
+function applySettingsToForm(settings) {
+  bubbleAutoTrack.checked = settings.autoTrack !== false;
+  bubbleOffsetY.value = settings.offsetY ?? 0;
+  bubbleDuration.value = settings.duration ?? 3.5;
+  bubbleFontSize.value = settings.fontSize ?? 13;
+  bubbleBgColor.value = settings.bgColor || "#0f0f14";
+  bubbleBgColorText.value = settings.bgColor || "#0f0f14";
+  bubbleBgOpacity.value = settings.bgOpacity ?? 0.92;
+  bubbleBorderColor.value = settings.borderColor || "#404050";
+  bubbleBorderColorText.value = settings.borderColor || "#404050";
+  bubbleBorderRadius.value = settings.borderRadius ?? 14;
+  bubbleHasTail.checked = settings.hasTail !== false;
+
+  syncSliderLabels();
+  updateMockBubble();
+}
+
+function loadBubbleTargetSettings(targetId) {
+  if (!cachedBubbleConfig) return;
+
+  const global = cachedBubbleConfig.globalBubbleSettings || FACTORY_DEFAULT_BUBBLE_SETTINGS;
+
+  if (targetId === "global") {
+    bubbleCustomToggleGroup.classList.add("hidden");
+    bubbleUseCustom.checked = false;
+    applySettingsToForm(global);
+  } else {
+    bubbleCustomToggleGroup.classList.remove("hidden");
+    const charDef = cachedBubbleConfig.characters?.[targetId];
+    const custom = charDef?.bubbleSettings || {};
+    const isCustom = custom.useCustom === true;
+    bubbleUseCustom.checked = isCustom;
+
+    const activeSettings = isCustom ? { ...global, ...custom } : global;
+    applySettingsToForm(activeSettings);
+  }
+}
+
+// Event Listeners for Bubble Form Controls
+bubbleTargetSelect.addEventListener("change", () => {
+  loadBubbleTargetSettings(bubbleTargetSelect.value);
+});
+
+bubbleUseCustom.addEventListener("change", () => {
+  const targetId = bubbleTargetSelect.value;
+  if (targetId === "global") return;
+  
+  if (!bubbleUseCustom.checked) {
+    const global = cachedBubbleConfig?.globalBubbleSettings || FACTORY_DEFAULT_BUBBLE_SETTINGS;
+    applySettingsToForm(global);
+    showToast("전역 기본값을 따르도록 복귀되었습니다.");
+  }
+});
+
+// Slider input sync
+[
+  [bubbleOffsetY, valBubbleOffsetY, (v) => {
+    const val = parseInt(v, 10) || 0;
+    return val > 0 ? `+${val}px (위로)` : (val < 0 ? `${val}px (아래로)` : "0px (기본)");
+  }],
+  [bubbleDuration, valBubbleDuration, (v) => `${parseFloat(v).toFixed(1)}초`],
+  [bubbleFontSize, valBubbleFontSize, (v) => `${v}px`],
+  [bubbleBgOpacity, valBubbleBgOpacity, (v) => `${Math.round(parseFloat(v) * 100)}%`],
+  [bubbleBorderRadius, valBubbleBorderRadius, (v) => `${v}px`],
+].forEach(([input, label, fmt]) => {
+  input.addEventListener("input", () => {
+    label.textContent = fmt(input.value);
+    updateMockBubble();
+  });
+});
+
+bubbleAutoTrack.addEventListener("change", updateMockBubble);
+bubbleHasTail.addEventListener("change", updateMockBubble);
+
+// Color input sync
+bubbleBgColor.addEventListener("input", () => {
+  bubbleBgColorText.value = bubbleBgColor.value;
+  updateMockBubble();
+});
+bubbleBgColorText.addEventListener("input", () => {
+  if (/^#[0-9A-Fa-f]{6}$/.test(bubbleBgColorText.value)) {
+    bubbleBgColor.value = bubbleBgColorText.value;
+    updateMockBubble();
+  }
+});
+
+bubbleBorderColor.addEventListener("input", () => {
+  bubbleBorderColorText.value = bubbleBorderColor.value;
+  updateMockBubble();
+});
+bubbleBorderColorText.addEventListener("input", () => {
+  bubbleBorderColor.value = bubbleBorderColorText.value;
+  updateMockBubble();
+});
+
+// Test Bubble Button
+btnTestBubble.addEventListener("click", async () => {
+  try {
+    const currentFormSettings = {
+      autoTrack: bubbleAutoTrack.checked,
+      offsetY: parseInt(bubbleOffsetY.value, 10),
+      duration: parseFloat(bubbleDuration.value),
+      fontSize: parseInt(bubbleFontSize.value, 10),
+      bgColor: bubbleBgColorText.value,
+      bgOpacity: parseFloat(bubbleBgOpacity.value),
+      borderColor: bubbleBorderColorText.value,
+      borderRadius: parseInt(bubbleBorderRadius.value, 10),
+      hasTail: bubbleHasTail.checked,
+    };
+
+    await invoke("trigger_test_bubble", {
+      payload: {
+        text: "💬 말풍선 미리보기 테스트입니다! ✨",
+        settings: currentFormSettings,
+      },
+    });
+    showToast("오버레이 화면에 테스트 말풍선을 띄웠습니다!");
+  } catch (err) {
+    showToast(`테스트 실패: ${err}`, true);
+  }
+});
+
+// Reset Button
+btnResetBubble.addEventListener("click", () => {
+  const targetId = bubbleTargetSelect.value;
+  if (targetId === "global") {
+    applySettingsToForm(FACTORY_DEFAULT_BUBBLE_SETTINGS);
+    showToast("말풍선 표준 기본값(Factory Default)으로 초기화되었습니다.");
+  } else {
+    bubbleUseCustom.checked = false;
+    const global = cachedBubbleConfig?.globalBubbleSettings || FACTORY_DEFAULT_BUBBLE_SETTINGS;
+    applySettingsToForm(global);
+    showToast("캐릭터 전용 설정이 초기화되어 전역 기본값으로 복귀되었습니다.");
+  }
+});
+
+// Save Bubble Settings
+formBubble.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const targetId = bubbleTargetSelect.value;
+
+  const settings = {
+    autoTrack: bubbleAutoTrack.checked,
+    offsetY: parseInt(bubbleOffsetY.value, 10),
+    duration: parseFloat(bubbleDuration.value),
+    fontSize: parseInt(bubbleFontSize.value, 10),
+    bgColor: bubbleBgColorText.value,
+    bgOpacity: parseFloat(bubbleBgOpacity.value),
+    borderColor: bubbleBorderColorText.value,
+    borderRadius: parseInt(bubbleBorderRadius.value, 10),
+    hasTail: bubbleHasTail.checked,
+  };
+
+  if (targetId !== "global") {
+    settings.useCustom = bubbleUseCustom.checked;
+  }
+
+  try {
+    showToast("말풍선 설정 저장 중...");
+    await invoke("save_bubble_settings", {
+      payload: {
+        target_id: targetId,
+        settings,
+      },
+    });
+
+    cachedBubbleConfig = await invoke("get_character_configs");
+    showToast("💾 말풍선 설정이 성공적으로 저장되었습니다!");
+  } catch (err) {
+    showToast(`설정 저장 실패: ${err}`, true);
+  }
+});
+
+// ==========================================================================
 // Real-time Event Listener & Lifecycle Sync
 // ==========================================================================
-listen("characters-updated", () => {
+function refreshActiveTab() {
   loadGallery();
+  const activeTab = document.querySelector(".tab-btn.active")?.dataset.tab;
+  if (activeTab === "bubble") {
+    loadBubbleSettingsTab();
+  }
+}
+
+listen("characters-updated", () => {
+  refreshActiveTab();
 });
 
 listen("switch-character", () => {
-  loadGallery();
+  refreshActiveTab();
+});
+
+listen("bubble-settings-updated", () => {
+  refreshActiveTab();
 });
 
 window.addEventListener("focus", () => {
-  loadGallery();
+  refreshActiveTab();
 });
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
-    loadGallery();
+    refreshActiveTab();
   }
 });
 
