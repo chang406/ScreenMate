@@ -47,6 +47,7 @@ let isAlwaysOnTop = localStorage.getItem("screenmate_always_on_top") !== "false"
 function getActiveBubbleSettings() {
   const globalSettings = config?.globalBubbleSettings || {
     autoTrack: true,
+    offsetX: 0,
     offsetY: 0,
     duration: 3.5,
     fontSize: 13,
@@ -60,10 +61,11 @@ function getActiveBubbleSettings() {
   const charDef = config?.characters?.[currentKey];
   const charSettings = charDef?.bubbleSettings;
 
-  if (charSettings && charSettings.useCustom) {
+  if (charSettings && charSettings.useCustom !== false) {
     return {
       autoTrack: charSettings.autoTrack ?? globalSettings.autoTrack,
-      offsetY: charSettings.offsetY ?? globalSettings.offsetY,
+      offsetX: charSettings.offsetX ?? globalSettings.offsetX ?? 0,
+      offsetY: charSettings.offsetY ?? globalSettings.offsetY ?? 0,
       duration: charSettings.duration ?? globalSettings.duration,
       fontSize: charSettings.fontSize ?? globalSettings.fontSize,
       bgColor: charSettings.bgColor ?? globalSettings.bgColor,
@@ -71,13 +73,6 @@ function getActiveBubbleSettings() {
       borderColor: charSettings.borderColor ?? globalSettings.borderColor,
       borderRadius: charSettings.borderRadius ?? globalSettings.borderRadius,
       hasTail: charSettings.hasTail ?? globalSettings.hasTail,
-    };
-  }
-
-  if (charSettings?.offsetY !== undefined && !charSettings.useCustom) {
-    return {
-      ...globalSettings,
-      offsetY: charSettings.offsetY,
     };
   }
 
@@ -104,6 +99,7 @@ function applyBubbleStyles(overrideSettings = null) {
   const borderColor = s.borderColor || "rgba(255, 255, 255, 0.25)";
 
   speechBubble.style.setProperty("--bubble-bg", bgRgba);
+  speechBubble.style.setProperty("--bubble-offset-x", `${s.offsetX || 0}px`);
   speechBubble.style.setProperty("--bubble-font-size", `${s.fontSize || 13}px`);
   speechBubble.style.setProperty("--bubble-radius", `${s.borderRadius || 14}px`);
   speechBubble.style.setProperty("--bubble-border", `1.5px solid ${borderColor}`);
@@ -122,36 +118,30 @@ function updateBubblePosition(overrideSettings = null) {
   if (!s.autoTrack) {
     const fixedTop = Math.max(2, 20 - offsetY);
     speechBubble.style.setProperty("--bubble-top", `${fixedTop}px`);
+    speechBubble.style.setProperty("--bubble-bottom", "auto");
     return;
   }
 
   const charDef = config?.characters?.[currentKey];
-  let characterTopY = 0;
+  const winHeight = window.innerHeight || 920;
+  const gap = 12; // 말풍선 꼬리와 머리 사이의 기본 간격
+
+  let characterHeadY = 120;
 
   if (charDef?.type === "live2d" && currentLive2DModel) {
-    try {
-      const bounds = currentLive2DModel.getBounds();
-      characterTopY = bounds.y;
-    } catch (_) {
-      characterTopY = currentLive2DModel.y || 120;
-    }
+    // 실시간 모션/호흡에 의해 요동치지 않는 안정된 모델 기준선(model.y) 사용
+    characterHeadY = currentLive2DModel.y !== undefined ? currentLive2DModel.y : 120;
   } else if (imgEl && !imgEl.classList.contains("hidden")) {
     const rect = imgEl.getBoundingClientRect();
-    characterTopY = rect.top;
-  } else {
-    characterTopY = 120;
+    characterHeadY = rect.top;
   }
 
-  const bubbleHeight = speechBubble.offsetHeight || 42;
-  const gap = 12; // 말풍선 꼬리와 머리 사이의 기본 간격
-  
-  // 양수(+ / 오른쪽): 위로 더 올라감 (-offsetY)
-  // 음수(- / 왼쪽): 머리 쪽으로 더 내려옴 (+ |offsetY|)
-  const desiredTop = characterTopY - bubbleHeight - gap - offsetY;
+  // 뷰포트 바닥(Bottom) 기준 말풍선 바닥 위치 고정 (Bottom-Pinned)
+  // 문장 길이에 따라 높이가 변해도 바닥과 꼬리표는 머리 위에 완벽 고정되고 위쪽으로만 확장됨
+  const desiredBottom = (winHeight - characterHeadY) + gap + offsetY;
 
-  // 상단 화면(2px)을 벗어나지 않도록 클램핑
-  const safeTop = Math.max(2, Math.round(desiredTop));
-  speechBubble.style.setProperty("--bubble-top", `${safeTop}px`);
+  speechBubble.style.setProperty("--bubble-top", "auto");
+  speechBubble.style.setProperty("--bubble-bottom", `${Math.max(10, Math.round(desiredBottom))}px`);
 }
 
 function showSubtitle(text, durationOverride = null, overrideSettings = null) {

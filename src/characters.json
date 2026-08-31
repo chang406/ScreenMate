@@ -2,6 +2,19 @@
   "activeCharacter": "huohuo",
   "characters": {
     "huohuo": {
+      "bubbleSettings": {
+        "autoTrack": true,
+        "bgColor": "#0f0f14",
+        "bgOpacity": 0.92,
+        "borderColor": "#404050",
+        "borderRadius": 14,
+        "duration": 3.5,
+        "fontSize": 13,
+        "hasTail": true,
+        "offsetX": 44,
+        "offsetY": -16,
+        "useCustom": true
+      },
       "modelPath": "characters/custom_characters/huohuo/huohuo.model3.json",
       "name": "곽향 / HuoHuo (Live2D)",
       "reactions": {
@@ -380,6 +393,7 @@
     "duration": 3.5,
     "fontSize": 13,
     "hasTail": true,
+    "offsetX": 0,
     "offsetY": 0
   }
 }

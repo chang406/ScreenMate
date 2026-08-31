@@ -26,8 +26,11 @@ body {
 /* 선명하고 또렷한 말풍선 UI (CSS 변수 기반 풀 커스텀 지원) */
 #speech-bubble {
   position: absolute;
-  top: var(--bubble-top, 20px);
+  top: var(--bubble-top, auto);
+  bottom: var(--bubble-bottom, auto);
+  min-width: 120px;
   max-width: 85%;
+  box-sizing: border-box;
   padding: 10px 16px;
   background: var(--bubble-bg, rgba(15, 15, 20, 0.92));
   backdrop-filter: blur(12px);
@@ -35,11 +38,14 @@ body {
   font-size: var(--bubble-font-size, 13px);
   font-weight: 600;
   letter-spacing: -0.2px;
+  line-height: 1.45;
+  word-break: keep-all;
   border-radius: var(--bubble-radius, 14px);
   border: var(--bubble-border, 1.5px solid rgba(255, 255, 255, 0.25));
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
   text-align: center;
-  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), top 0.2s ease-out;
+  margin-left: var(--bubble-offset-x, 0px);
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.2s ease-out, top 0.2s ease-out, margin-left 0.2s ease-out;
   transform: translateY(0);
   opacity: 1;
   pointer-events: none;

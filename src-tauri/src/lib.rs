@@ -201,12 +201,31 @@ fn save_2d_character(app: AppHandle, payload: Save2DCharacterPayload) -> Result<
     Ok(())
 }
 
+/// Checks if a PNG texture file has 4K resolution (width or height >= 3840)
+fn is_png_4k(path: &Path) -> bool {
+    if let Ok(mut file) = fs::File::open(path) {
+        use std::io::Read;
+        let mut header = [0u8; 24];
+        if file.read_exact(&mut header).is_ok() {
+            // PNG signature: 89 50 4E 47 0D 0A 1A 0A
+            if &header[0..8] == b"\x89PNG\r\n\x1a\n" {
+                // IHDR width at 16..20, height at 20..24 (Big Endian)
+                let width = u32::from_be_bytes([header[16], header[17], header[18], header[19]]);
+                let height = u32::from_be_bytes([header[20], header[21], header[22], header[23]]);
+                return width >= 3840 || height >= 3840;
+            }
+        }
+    }
+    false
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Live2DParseResult {
     pub model_filename: String,
     pub model_folder: String,
     pub motion_groups: Vec<String>,
     pub suggested_mapping: HashMap<String, String>,
+    pub is_4k: bool,
 }
 
 /// Recursively copies a directory to destination.
@@ -253,6 +272,24 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
 
     let content = fs::read_to_string(&model_file_path).map_err(|e| e.to_string())?;
     let json_val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+
+    // Check if any texture is 4K (width/height >= 3840)
+    let mut is_4k = false;
+    if let Some(textures) = json_val
+        .get("FileReferences")
+        .and_then(|f| f.get("Textures"))
+        .and_then(|t| t.as_array())
+    {
+        for tex in textures {
+            if let Some(rel_path) = tex.as_str() {
+                let tex_full_path = p.join(rel_path);
+                if is_png_4k(&tex_full_path) {
+                    is_4k = true;
+                    break;
+                }
+            }
+        }
+    }
 
     let mut motion_groups: Vec<String> = Vec::new();
     if let Some(motions) = json_val
@@ -303,6 +340,7 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
         model_folder: folder_path,
         motion_groups,
         suggested_mapping: mapping,
+        is_4k,
     })
 }
 
@@ -313,6 +351,7 @@ pub struct SaveLive2DCharacterPayload {
     pub source_folder: String,
     pub model_filename: String,
     pub reactions: Value, // formatted reactions object
+    pub is_4k: Option<bool>,
 }
 
 /// Imports and copies a Live2D character to custom_characters/<id> and registers it.
@@ -335,15 +374,17 @@ fn save_live2d_character(app: AppHandle, payload: SaveLive2DCharacterPayload) ->
     let mut val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
     if let Some(chars) = val.get_mut("characters").and_then(|c| c.as_object_mut()) {
-        chars.insert(
-            payload.id.clone(),
-            json!({
-                "name": payload.name,
-                "type": "live2d",
-                "modelPath": relative_model_path,
-                "reactions": payload.reactions
-            }),
-        );
+        let is_4k_val = payload.is_4k.unwrap_or(false);
+        let mut char_obj = json!({
+            "name": payload.name,
+            "type": "live2d",
+            "modelPath": relative_model_path,
+            "reactions": payload.reactions
+        });
+        if is_4k_val {
+            char_obj["is4k"] = json!(true);
+        }
+        chars.insert(payload.id.clone(), char_obj);
     }
 
     let updated_json = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
