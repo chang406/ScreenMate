@@ -7,6 +7,8 @@ const tabPanes = document.querySelectorAll(".tab-pane");
 const toastEl = document.getElementById("toast");
 const charGrid = document.getElementById("character-grid");
 const refreshGalleryBtn = document.getElementById("refresh-gallery-btn");
+const deleteModeBtn = document.getElementById("delete-mode-btn");
+let isDeleteMode = false;
 
 // 2D Form Elements
 const form2D = document.getElementById("form-add-2d");
@@ -113,17 +115,29 @@ async function loadGallery() {
 
     charGrid.innerHTML = "";
 
+    // 삭제 모드 클래스 동기화
+    if (isDeleteMode) {
+      charGrid.classList.add("delete-mode");
+    } else {
+      charGrid.classList.remove("delete-mode");
+    }
+
     for (const [key, charDef] of Object.entries(characters)) {
       const isCurrentActive = key === activeKey;
       const isPreset = key === "mao" || key === "pixel_cat" || key === "wanko";
 
       const card = document.createElement("div");
-      card.className = isCurrentActive ? "char-card active" : "char-card";
+      let cardClass = "char-card";
+      if (isCurrentActive) cardClass += " active";
+      if (isPreset) cardClass += " is-preset";
+      card.className = cardClass;
 
       // Thumbnail
       let thumbHtml = "";
       if (charDef.type === "live2d") {
-        const icon = key === "wanko" ? "🐶" : "🪄";
+        let icon = "🪄";
+        if (key === "wanko") icon = "🐶";
+        if (key === "huohuo") icon = "👻";
         thumbHtml = `<div class="card-thumb"><span class="live2d-avatar">${icon}</span></div>`;
       } else {
         const firstSrc = charDef.states?.idle?.src || Object.values(charDef.states || {})[0]?.src || "";
@@ -132,6 +146,21 @@ async function loadGallery() {
 
       const typeBadgeClass = charDef.type === "live2d" ? "badge-live2d" : "badge-image";
       const typeLabel = charDef.type === "live2d" ? "Live2D 4K" : "2D Image";
+
+      let actionsHtml = "";
+      if (!isDeleteMode) {
+        // 일반 모드: 모든 카드가 깔끔하게 1개의 버튼만 표시 (삭제 버튼 노출 X)
+        actionsHtml = isCurrentActive
+          ? '<button class="btn-primary btn-sm flex-1" disabled>현재 적용됨</button>'
+          : `<button class="btn-primary btn-sm flex-1 select-char-btn" data-id="${key}">선택하여 사용</button>`;
+      } else {
+        // 삭제 모드: 프리셋은 비활성화, 커스텀 캐릭터는 삭제 실행 버튼 표시
+        if (isPreset) {
+          actionsHtml = '<button class="btn-sm flex-1 delete-overlay-btn preset-disabled" disabled>🔒 기본 프리셋 (삭제 불가)</button>';
+        } else {
+          actionsHtml = `<button class="btn-sm flex-1 delete-overlay-btn delete-char-btn" data-id="${key}" data-name="${charDef.name}">🗑️ 이 캐릭터 삭제</button>`;
+        }
+      }
 
       card.innerHTML = `
         ${isCurrentActive ? '<span class="active-pill">✓ 사용 중</span>' : ""}
@@ -143,23 +172,14 @@ async function loadGallery() {
           </div>
         </div>
         <div class="card-actions">
-          ${
-            isCurrentActive
-              ? '<button class="btn-primary btn-sm flex-1" disabled>현재 적용됨</button>'
-              : `<button class="btn-primary btn-sm flex-1 select-char-btn" data-id="${key}">선택하여 사용</button>`
-          }
-          ${
-            !isPreset
-              ? `<button class="btn-danger btn-sm delete-char-btn" data-id="${key}" data-name="${charDef.name}">삭제</button>`
-              : ""
-          }
+          ${actionsHtml}
         </div>
       `;
 
       charGrid.appendChild(card);
     }
 
-    // Attach listeners
+    // Attach listeners for select
     document.querySelectorAll(".select-char-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
@@ -173,15 +193,17 @@ async function loadGallery() {
       });
     });
 
+    // Attach listeners for delete
     document.querySelectorAll(".delete-char-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
         const id = btn.dataset.id;
         const name = btn.dataset.name;
-        if (confirm(`정말로 "${name}" 캐릭터를 삭제하시겠습니까?`)) {
+        if (confirm(`정말로 "${name}" 캐릭터를 완전히 삭제하시겠습니까?\n(해당 캐릭터의 설정 및 파일이 삭제됩니다)`)) {
           try {
             await invoke("delete_custom_character", { id });
             showToast(`"${name}" 캐릭터가 삭제되었습니다.`);
-            loadGallery();
+            await loadGallery();
           } catch (err) {
             showToast(`삭제 실패: ${err}`, true);
           }
@@ -193,6 +215,19 @@ async function loadGallery() {
     showToast("캐릭터 목록을 불러오지 못했습니다.", true);
   }
 }
+
+deleteModeBtn.addEventListener("click", () => {
+  isDeleteMode = !isDeleteMode;
+  if (isDeleteMode) {
+    deleteModeBtn.textContent = "❌ 삭제 모드 종료";
+    deleteModeBtn.classList.add("btn-delete-mode-active");
+    showToast("삭제할 커스텀 캐릭터의 [🗑️ 이 캐릭터 삭제] 버튼을 눌러주세요.");
+  } else {
+    deleteModeBtn.textContent = "🗑️ 삭제 모드";
+    deleteModeBtn.classList.remove("btn-delete-mode-active");
+  }
+  loadGallery();
+});
 
 refreshGalleryBtn.addEventListener("click", loadGallery);
 

@@ -1,6 +1,117 @@
 {
-  "activeCharacter": "mao",
+  "activeCharacter": "huohuo",
   "characters": {
+    "huohuo": {
+      "modelPath": "characters/custom_characters/huohuo/huohuo.model3.json",
+      "name": "곽향 / HuoHuo (Live2D)",
+      "reactions": {
+        "busy": {
+          "expressions": [
+            "baozhen"
+          ],
+          "motionGroup": "Busy",
+          "motionIndex": [
+            0
+          ],
+          "subtitles": [
+            "쿠션을 꼭 안고 집중 중이에요! 🪄",
+            "명령어 실행 중... 무서워도 힘낼게요!",
+            "열심히 코딩 중이에요! ✨"
+          ]
+        },
+        "click_react": {
+          "expressions": [
+            "angry",
+            "cry",
+            null
+          ],
+          "motionGroup": "Touch",
+          "motionIndex": [
+            0
+          ],
+          "subtitles": [
+            "깜짝이야! 저, 저를 부르셨나요...? 💦",
+            "도리도리~ 화, 화이팅이에요! 💕",
+            "쓰다듬어 주시는 건가요...?"
+          ]
+        },
+        "error": {
+          "expressions": [
+            "white_eyes",
+            "cry"
+          ],
+          "motionGroup": "Error",
+          "motionIndex": [
+            0
+          ],
+          "subtitles": [
+            "히익?! 영혼이 빠져나갈 것 같아요! 👻💦",
+            "에, 에러가 났어요! 꼬리야 살려줘!",
+            "으앙! 빨간불이 떴어요... 로그 확인해 주세요!"
+          ]
+        },
+        "idle": {
+          "expressions": [
+            null
+          ],
+          "motionGroup": "Idle",
+          "motionIndex": [
+            0
+          ],
+          "subtitles": [
+            "어... 언제든 말씀해 주세요...",
+            "귀신이 나오진 않겠죠...?",
+            "열심히 대기 중이에요... 꼬리 살랑"
+          ]
+        },
+        "sleeping": {
+          "expressions": [
+            "cry",
+            null
+          ],
+          "motionGroup": "Sleep",
+          "motionIndex": [
+            0
+          ],
+          "subtitles": [
+            "Zzz... 졸려요... 꾸벅꾸벅 💤",
+            "(조는 중...) 쿨쿨...",
+            "꼬리야... 불 꺼줘... 💤"
+          ]
+        },
+        "talking": {
+          "expressions": [
+            "qizi1",
+            "qizi2"
+          ],
+          "motionGroup": "Talk",
+          "motionIndex": [
+            0
+          ],
+          "subtitles": [
+            "해, 해냈어요! 깃발을 흔들며 완료 알림! 🚩✨",
+            "작업 완료! 꼬리야 우리 성공했어!",
+            "결과가 나왔어요! 확인해 주세요!"
+          ]
+        },
+        "thinking": {
+          "expressions": [
+            "angry",
+            null
+          ],
+          "motionGroup": "Think",
+          "motionIndex": [
+            0
+          ],
+          "subtitles": [
+            "어디 보자... 호기심 가득 관찰 중!",
+            "조, 조금만 기다려 주세요... 생각 중이에요!",
+            "부적을 꼼꼼히 확인하는 중..."
+          ]
+        }
+      },
+      "type": "live2d"
+    },
     "mao": {
       "modelPath": "characters/mao/Mao.model3.json",
       "name": "Mao (Live2D 4K)",

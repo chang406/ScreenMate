@@ -15,7 +15,25 @@
 
 ---
 
-## 2. 빌드 및 실행 명령어 (Commands)
+## 2. 제품 철학 및 스코프 경계선 (Philosophy & Anti-Patterns)
+
+모든 AI 에이전트는 기능 추가나 코드 수정 시 다음 제품 철학과 스코프 제한을 반드시 준수해야 합니다.
+
+### ① 핵심 철학 (The North Star)
+- **"AI 코딩 에이전트의 백그라운드 두뇌 상태를 투명하게 실시간 시각화해 주는 가볍고 귀여운 동반자"**
+- 에이전트의 7대 상태(생각, 실행, 완료, 에러 등)에 대한 즉각적이고 매력적인 시청각 반응에 집중합니다.
+
+### ② 명백한 스코프 아웃 (Strictly Out of Scope / Anti-Patterns)
+1. ❌ **자체 대화형 AI 챗봇화 금지**:
+   - 사용자가 직접 말을 걸고 답변을 받는 챗봇/음성 비서로 확장하지 않습니다. (ScreenMate는 Claude/Gemini의 대체재가 아니라 **감시자/표현자(Observer & Visualizer)**입니다.)
+2. ❌ **잡동사니 생산성 위젯화 금지**:
+   - 뽀모도로 타이머, 투두리스트, 캘린더, 날씨, 상시 하드웨어(CPU/RAM) 폴링 등 무거운 위젯 기능을 넣지 않습니다.
+3. ❌ **침입형(Intrusive) UI 금지**:
+   - 개발자의 포커스를 빼앗거나 화면 중앙을 침범하는 강제 팝업창을 띄우지 않습니다.
+
+---
+
+## 3. 빌드 및 실행 명령어 (Commands)
 
 ```bash
 # 필수: Rust 툴체인 (cargo) 및 C++ Build Tools (Windows)
@@ -33,7 +51,7 @@ cargo build --release
 
 ---
 
-## 3. 핵심 아키텍처 및 불변 규칙 (Core Architecture & Rules)
+## 4. 핵심 아키텍처 및 불변 규칙 (Core Architecture & Rules)
 
 ### ① 투명 마우스 클릭 관통 (Per-pixel Click-Through)
 - **백엔드 (`src-tauri/src/cursor_watcher.rs`)**: 16ms 주기로 OS 마우스 커서 좌표를 감시하여 프론트엔드로 `cursor-position` 이벤트를 전송.
@@ -75,7 +93,7 @@ cargo build --release
 
 ---
 
-## 4. 캐릭터 추가 및 스키마 확장 가이드
+## 5. 캐릭터 추가 및 스키마 확장 가이드
 
 - **공개/기본 캐릭터**: `src/characters/<캐릭터명>/`에 배치합니다 (Mao, Wanko, 냥이 등 라이선스 안전 에셋).
 - **개인 로컬 전용 커스텀 캐릭터 (Git 커밋 방지)**: `src/characters/custom_characters/<캐릭터명>/` 폴더에 배치합니다. 이 경로는 `.gitignore`로 보호되어 실수로 원격 저장소에 업로드되지 않습니다.
@@ -95,7 +113,7 @@ cargo build --release
 
 ---
 
-## 5. 변경 시 필수 체크리스트 & 행동 수칙
+## 6. 변경 시 필수 체크리스트 & 행동 수칙
 
 1. [ ] 백엔드 Rust 변경 시: `src-tauri`에서 `cargo check` 에러 0개 확인.
 2. [ ] 프론트엔드 변경 시: 마우스 클릭 관통 및 투명 배경이 정상 유지되는지 확인.

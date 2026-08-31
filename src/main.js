@@ -488,10 +488,10 @@ function fitModelToCanvas() {
   const naturalWidth = model.width || 500;
   const naturalHeight = model.height || 600;
 
-  // 100% 기준 캐릭터 기본 비율 (창 440x640의 약 72% 차지)
+  // 100% 기준 캐릭터 기본 비율 (640x920 창에서 약 46% 차지하여 200% 확대 시에도 상단 말풍선 공간 완벽 확보)
   const baseScale = Math.min(
-    (canvas.width * 0.72) / naturalWidth,
-    (canvas.height * 0.72) / naturalHeight
+    (canvas.width * 0.46) / naturalWidth,
+    (canvas.height * 0.46) / naturalHeight
   );
 
   const finalScale = baseScale * currentScale;
@@ -501,10 +501,10 @@ function fitModelToCanvas() {
 }
 
 async function setScale(scale, notify = true) {
-  currentScale = Math.min(Math.max(scale, 0.7), 1.5);
+  currentScale = Math.min(Math.max(scale, 0.6), 2.0);
   localStorage.setItem("screenmate_scale", currentScale.toString());
 
-  // 윈도우 창 크기는 440x640으로 넉넉하게 고정하고, 캐릭터 모델만 내부에서 배율 조절
+  // 윈도우 창 크기는 640x920으로 넉넉하게 고정하고, 캐릭터 모델만 내부에서 배율 조절
   if (currentLive2DModel) {
     fitModelToCanvas();
   }
@@ -648,17 +648,17 @@ function isOverCharacter(x, y) {
     const naturalWidth = currentLive2DModel.width || 500;
     const naturalHeight = currentLive2DModel.height || 600;
     const baseScale = Math.min(
-      (canvas.width * 0.72) / naturalWidth,
-      (canvas.height * 0.72) / naturalHeight
+      (canvas.width * 0.46) / naturalWidth,
+      (canvas.height * 0.46) / naturalHeight
     );
     const finalScale = baseScale * currentScale;
     const charW = naturalWidth * finalScale;
     const charH = naturalHeight * finalScale;
 
-    const charLeft = (canvas.clientWidth - charW) / 2 + charW * 0.12;
-    const charRight = (canvas.clientWidth + charW) / 2 - charW * 0.12;
-    const charTop = canvas.clientHeight - charH - 16 + charH * 0.12;
-    const charBottom = canvas.clientHeight - 16;
+    const charLeft = (canvas.clientWidth - charW) / 2 + charW * 0.08;
+    const charRight = (canvas.clientWidth + charW) / 2 - charW * 0.08;
+    const charTop = canvas.clientHeight - charH - 16 + charH * 0.05;
+    const charBottom = canvas.clientHeight - 8;
     return x >= charLeft && x <= charRight && y >= charTop && y <= charBottom;
   } else {
     const rect = imgEl.getBoundingClientRect();
