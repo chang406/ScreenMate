@@ -63,11 +63,20 @@
         <!-- 탭 2: 2D 이미지 캐릭터 추가 마법사 -->
         <section id="tab-add-2d" class="tab-pane">
           <form id="form-add-2d" class="form-container">
+            <div class="info-alert">
+              <span class="alert-icon">🔒</span>
+              <div class="alert-content">
+                <strong>로컬 전용 커스텀 캐릭터 (Local & Private)</strong>
+                <p>추가된 캐릭터 파일은 <code>src/characters/custom_characters/</code>에 안전하게 격리 보관되며, <code>.gitignore</code>로 보호되어 Git에 커밋되지 않습니다.</p>
+              </div>
+            </div>
+
             <div class="form-row">
               <div class="form-group flex-1">
                 <label for="2d-id">캐릭터 식별 ID (영문/숫자)</label>
                 <input type="text" id="2d-id" class="input-text" placeholder="예: my_hero" required pattern="[a-zA-Z0-9_\-]+" />
-                <span class="input-hint">영문, 숫자, 언더바(_)만 가능 (폴더명으로 사용)</span>
+                <div id="2d-id-status" class="id-status-msg"></div>
+                <span class="input-hint">영문 소문자, 숫자, 언더바(_) 권장 (폴더명 및 식별 키로 사용)</span>
               </div>
               <div class="form-group flex-1">
                 <label for="2d-name">표시 이름</label>
@@ -160,8 +169,11 @@
             <div class="info-alert">
               <span class="alert-icon">💡</span>
               <div class="alert-content">
-                <strong>스마트 자동 감지 (Auto-Detect)</strong>
-                <p>Live2D 모델이 들어있는 폴더 경로를 입력하시면, <code>.model3.json</code>을 자동 분석하여 7대 상태별 모션을 알아서 맞춰드립니다!</p>
+                <strong>스마트 자동 감지 & 로컬 전용 저장 (Auto-Detect)</strong>
+                <p>Live2D 모델 폴더를 선택하시면, <code>.model3.json</code> 및 하위 폴더를 자동 분석하여 7대 상태별 모션을 알아서 맞춰드립니다! (<code>custom_characters/</code>에 로컬 격리 보관)</p>
+                <div class="alert-tip">
+                  📌 <strong>권장 사항</strong>: Live2D Web SDK 호환성을 위해 리깅 모델 파일명(<code>*.model3.json</code>, <code>*.moc3</code> 등)은 <strong>순수 영문(ASCII) 작성을 권장</strong>합니다. (한자/한글 등 비영문 파일명은 등록 시 영문 ID로 자동 변환됩니다.)
+                </div>
               </div>
             </div>
 
@@ -169,6 +181,8 @@
               <div class="form-group flex-1">
                 <label for="l2d-id">캐릭터 식별 ID (영문/숫자)</label>
                 <input type="text" id="l2d-id" class="input-text" placeholder="예: hiyori" required pattern="[a-zA-Z0-9_\-]+" />
+                <div id="l2d-id-status" class="id-status-msg"></div>
+                <span class="input-hint">영문 소문자, 숫자, 언더바(_) 권장 (폴더명 및 식별 키로 사용)</span>
               </div>
               <div class="form-group flex-1">
                 <label for="l2d-name">표시 이름</label>
@@ -179,10 +193,11 @@
             <div class="form-group">
               <label for="l2d-folder">Live2D 모델 폴더 경로</label>
               <div class="input-action-group">
-                <input type="text" id="l2d-folder" class="input-text" placeholder="C:\Users\...\hiyori_free_model" required />
+                <input type="text" id="l2d-folder" class="input-text flex-1" placeholder="[📁 폴더 찾기]를 누르거나 경로를 입력하세요" required />
+                <button type="button" id="btn-browse-l2d" class="btn-secondary">📁 폴더 찾기</button>
                 <button type="button" id="btn-analyze-l2d" class="btn-secondary">🔍 스마트 분석</button>
               </div>
-              <span class="input-hint">*.model3.json 및 텍스처/모션 폴더가 있는 폴더의 절대 경로</span>
+              <span class="input-hint">*.model3.json 또는 하위 폴더가 포함된 Live2D 모델 폴더 (안정적인 로드를 위해 영문 파일명 권장)</span>
             </div>
 
             <!-- 분석 결과 매핑 박스 (초기엔 숨김) -->

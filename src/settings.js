@@ -9,11 +9,13 @@ const charGrid = document.getElementById("character-grid");
 const refreshGalleryBtn = document.getElementById("refresh-gallery-btn");
 const deleteModeBtn = document.getElementById("delete-mode-btn");
 let isDeleteMode = false;
+let knownCharacterIds = new Set();
 
 // 2D Form Elements
 const form2D = document.getElementById("form-add-2d");
 const input2DId = document.getElementById("2d-id");
 const input2DName = document.getElementById("2d-name");
+const status2DId = document.getElementById("2d-id-status");
 const quickModeToggle = document.getElementById("2d-quick-mode");
 const slotThinking = document.getElementById("slot-thinking");
 const slotTalking = document.getElementById("slot-talking");
@@ -34,7 +36,9 @@ const subsTalking = document.getElementById("subs-talking");
 const formLive2D = document.getElementById("form-add-live2d");
 const inputL2DId = document.getElementById("l2d-id");
 const inputL2DName = document.getElementById("l2d-name");
+const statusL2DId = document.getElementById("l2d-id-status");
 const inputL2DFolder = document.getElementById("l2d-folder");
+const btnBrowseL2D = document.getElementById("btn-browse-l2d");
 const btnAnalyzeL2D = document.getElementById("btn-analyze-l2d");
 const btnSaveLive2D = document.getElementById("btn-save-live2d");
 const l2dMappingSection = document.getElementById("l2d-mapping-section");
@@ -64,6 +68,7 @@ let toastTimeout = null;
 // Toast Helper
 // ==========================================================================
 function showToast(message, isError = false) {
+  if (!toastEl) return;
   toastEl.textContent = message;
   toastEl.className = isError ? "toast error" : "toast";
   
@@ -72,6 +77,66 @@ function showToast(message, isError = false) {
     toastEl.classList.add("hidden");
   }, 3000);
 }
+
+// ==========================================================================
+// ID Auto-Sync & Duplicate Validation Helpers
+// ==========================================================================
+function slugifyName(name) {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .replace(/[^a-zA-Z0-9_\-\s]/g, "")
+    .trim()
+    .replace(/[\s\-]+/g, "_");
+}
+
+function validateId(inputEl, statusEl) {
+  if (!inputEl || !statusEl) return true;
+  const id = inputEl.value.trim().toLowerCase();
+  if (!id) {
+    statusEl.className = "id-status-msg";
+    statusEl.textContent = "";
+    inputEl.classList.remove("has-warning", "has-success");
+    return true;
+  }
+
+  if (knownCharacterIds.has(id)) {
+    statusEl.className = "id-status-msg show warning";
+    statusEl.textContent = "⚠️ 이미 등록된 ID입니다. 저장 시 기존 캐릭터가 덮어써집니다.";
+    inputEl.classList.add("has-warning");
+    inputEl.classList.remove("has-success");
+    return false;
+  } else {
+    statusEl.className = "id-status-msg show success";
+    statusEl.textContent = "✓ 사용 가능한 고유 ID입니다.";
+    inputEl.classList.remove("has-warning");
+    inputEl.classList.add("has-success");
+    return true;
+  }
+}
+
+function setupIdAutoSyncAndCheck(inputName, inputId, statusEl) {
+  if (!inputName || !inputId || !statusEl) return;
+  let userModifiedId = false;
+
+  inputName.addEventListener("input", () => {
+    if (!userModifiedId || !inputId.value.trim()) {
+      const slug = slugifyName(inputName.value);
+      if (slug) {
+        inputId.value = slug;
+      }
+      validateId(inputId, statusEl);
+    }
+  });
+
+  inputId.addEventListener("input", () => {
+    userModifiedId = inputId.value.trim().length > 0;
+    validateId(inputId, statusEl);
+  });
+}
+
+setupIdAutoSyncAndCheck(input2DName, input2DId, status2DId);
+setupIdAutoSyncAndCheck(inputL2DName, inputL2DId, statusL2DId);
 
 // ==========================================================================
 // Tab Switching
@@ -112,7 +177,9 @@ async function loadGallery() {
     const config = await invoke("get_character_configs");
     const activeKey = config.activeCharacter;
     const characters = config.characters || {};
+    knownCharacterIds = new Set(Object.keys(characters));
 
+    if (!charGrid) return;
     charGrid.innerHTML = "";
 
     // 삭제 모드 클래스 동기화
@@ -227,26 +294,32 @@ async function loadGallery() {
   }
 }
 
-deleteModeBtn.addEventListener("click", () => {
-  isDeleteMode = !isDeleteMode;
-  if (isDeleteMode) {
-    deleteModeBtn.textContent = "❌ 삭제 모드 종료";
-    deleteModeBtn.classList.add("btn-delete-mode-active");
-    showToast("삭제할 커스텀 캐릭터의 [🗑️ 이 캐릭터 삭제] 버튼을 눌러주세요.");
-  } else {
-    deleteModeBtn.textContent = "🗑️ 삭제 모드";
-    deleteModeBtn.classList.remove("btn-delete-mode-active");
-  }
-  loadGallery();
-});
+if (deleteModeBtn) {
+  deleteModeBtn.addEventListener("click", () => {
+    isDeleteMode = !isDeleteMode;
+    if (isDeleteMode) {
+      deleteModeBtn.textContent = "❌ 삭제 모드 종료";
+      deleteModeBtn.classList.add("btn-delete-mode-active");
+      showToast("삭제할 커스텀 캐릭터의 [🗑️ 이 캐릭터 삭제] 버튼을 눌러주세요.");
+    } else {
+      deleteModeBtn.textContent = "🗑️ 삭제 모드";
+      deleteModeBtn.classList.remove("btn-delete-mode-active");
+    }
+    loadGallery();
+  });
+}
 
-refreshGalleryBtn.addEventListener("click", loadGallery);
+if (refreshGalleryBtn) {
+  refreshGalleryBtn.addEventListener("click", loadGallery);
+}
 
 // ==========================================================================
 // Tab 2: 2D Image Wizard
 // ==========================================================================
 function setupDropZone(fileInput, previewImg, slotKey) {
+  if (!fileInput || !previewImg) return;
   const dropZone = fileInput.closest(".drop-zone");
+  if (!dropZone) return;
 
   function handleFile(file) {
     if (!file || !file.type.startsWith("image/")) {
@@ -260,7 +333,8 @@ function setupDropZone(fileInput, previewImg, slotKey) {
       raw2DFiles[slotKey] = dataUrl;
       previewImg.src = dataUrl;
       previewImg.classList.remove("hidden");
-      dropZone.querySelector(".drop-placeholder").style.display = "none";
+      const placeholder = dropZone.querySelector(".drop-placeholder");
+      if (placeholder) placeholder.style.display = "none";
     };
     reader.readAsDataURL(file);
   }
@@ -293,205 +367,283 @@ setupDropZone(fileIdle, previewIdle, "idle");
 setupDropZone(fileThinking, previewThinking, "thinking");
 setupDropZone(fileTalking, previewTalking, "talking");
 
-quickModeToggle.addEventListener("change", () => {
-  const isQuick = quickModeToggle.checked;
-  if (isQuick) {
-    slotThinking.classList.add("disabled");
-    slotTalking.classList.add("disabled");
-  } else {
-    slotThinking.classList.remove("disabled");
-    slotTalking.classList.remove("disabled");
-  }
-});
+if (quickModeToggle) {
+  quickModeToggle.addEventListener("change", () => {
+    const isQuick = quickModeToggle.checked;
+    if (isQuick) {
+      slotThinking?.classList.add("disabled");
+      slotTalking?.classList.add("disabled");
+    } else {
+      slotThinking?.classList.remove("disabled");
+      slotTalking?.classList.remove("disabled");
+    }
+  });
+}
 
-form2D.addEventListener("submit", async (e) => {
-  e.preventDefault();
+if (form2D) {
+  form2D.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  const id = input2DId.value.trim().toLowerCase();
-  const name = input2DName.value.trim();
-  const isQuick = quickModeToggle.checked;
+    const id = input2DId.value.trim().toLowerCase();
+    const name = input2DName.value.trim();
+    const isQuick = quickModeToggle.checked;
 
-  if (!raw2DFiles.idle) {
-    showToast("대기(IDLE) 이미지는 필수입니다!", true);
-    return;
-  }
+    if (!raw2DFiles.idle) {
+      showToast("대기(IDLE) 이미지는 필수입니다!", true);
+      return;
+    }
 
-  const filesPayload = {
-    idle: raw2DFiles.idle,
-    thinking: isQuick ? raw2DFiles.idle : (raw2DFiles.thinking || raw2DFiles.idle),
-    talking: isQuick ? raw2DFiles.idle : (raw2DFiles.talking || raw2DFiles.idle),
-  };
+    // 중복 ID 덮어쓰기 확인
+    if (knownCharacterIds.has(id)) {
+      const ok = confirm(`"${id}" ID를 가진 캐릭터가 이미 존재합니다.\n해당 캐릭터의 설정과 에셋을 덮어쓰시겠습니까?`);
+      if (!ok) return;
+    }
 
-  const parseSubtitles = (input) => {
-    return input.value
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-  };
+    const filesPayload = {
+      idle: raw2DFiles.idle,
+      thinking: isQuick ? raw2DFiles.idle : (raw2DFiles.thinking || raw2DFiles.idle),
+      talking: isQuick ? raw2DFiles.idle : (raw2DFiles.talking || raw2DFiles.idle),
+    };
 
-  const subtitlesPayload = {
-    idle: parseSubtitles(subsIdle),
-    thinking: parseSubtitles(subsThinking),
-    talking: parseSubtitles(subsTalking),
-  };
+    const parseSubtitles = (input) => {
+      if (!input) return [];
+      return input.value
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+    };
 
-  try {
-    showToast("2D 캐릭터 생성 중...");
-    await invoke("save_2d_character", {
-      payload: {
-        id,
-        name,
-        files: filesPayload,
-        subtitles: subtitlesPayload,
-      },
-    });
+    const subtitlesPayload = {
+      idle: parseSubtitles(subsIdle),
+      thinking: parseSubtitles(subsThinking),
+      talking: parseSubtitles(subsTalking),
+    };
 
-    // Automatically switch to the newly created character
-    await invoke("set_active_character", { id });
+    try {
+      showToast("2D 캐릭터 생성 중...");
+      await invoke("save_2d_character", {
+        payload: {
+          id,
+          name,
+          files: filesPayload,
+          subtitles: subtitlesPayload,
+        },
+      });
 
-    showToast(`🎉 "${name}" 캐릭터가 생성 및 적용되었습니다!`);
-    form2D.reset();
-    previewIdle.classList.add("hidden");
-    previewThinking.classList.add("hidden");
-    previewTalking.classList.add("hidden");
-    document.querySelectorAll(".drop-placeholder").forEach((el) => (el.style.display = "flex"));
-    raw2DFiles = { idle: null, thinking: null, talking: null };
+      // Automatically switch to the newly created character
+      await invoke("set_active_character", { id });
 
-    switchTab("gallery");
-  } catch (err) {
-    showToast(`저장 실패: ${err}`, true);
-  }
-});
+      showToast(`🎉 "${name}" 캐릭터가 생성 및 적용되었습니다!`);
+      form2D.reset();
+      previewIdle?.classList.add("hidden");
+      previewThinking?.classList.add("hidden");
+      previewTalking?.classList.add("hidden");
+      document.querySelectorAll(".drop-placeholder").forEach((el) => (el.style.display = "flex"));
+      raw2DFiles = { idle: null, thinking: null, talking: null };
+      if (status2DId) {
+        status2DId.className = "id-status-msg";
+        status2DId.textContent = "";
+      }
+      input2DId?.classList.remove("has-warning", "has-success");
+
+      switchTab("gallery");
+    } catch (err) {
+      showToast(`저장 실패: ${err}`, true);
+    }
+  });
+}
 
 // ==========================================================================
 // Tab 3: Live2D Smart Auto-Detect & Importer
 // ==========================================================================
-btnAnalyzeL2D.addEventListener("click", async () => {
-  const folderPath = inputL2DFolder.value.trim();
-  if (!folderPath) {
-    showToast("Live2D 모델 폴더 경로를 입력해 주세요.", true);
-    return;
-  }
+if (btnBrowseL2D) {
+  btnBrowseL2D.addEventListener("click", async () => {
+    try {
+      const selectedFolder = await invoke("pick_folder");
+      if (selectedFolder) {
+        inputL2DFolder.value = selectedFolder;
 
-  try {
-    btnAnalyzeL2D.textContent = "분석 중...";
-    btnAnalyzeL2D.disabled = true;
+        // Auto-fill Name and ID if empty based on folder name
+        const parts = selectedFolder.split(/[\\/]/).filter(Boolean);
+        const folderName = parts[parts.length - 1] || "";
+        if (inputL2DName && !inputL2DName.value.trim() && folderName) {
+          inputL2DName.value = folderName;
+        }
+        if (inputL2DId && !inputL2DId.value.trim() && folderName) {
+          inputL2DId.value = slugifyName(folderName);
+          validateId(inputL2DId, statusL2DId);
+        }
 
-    const result = await invoke("parse_live2d_folder", { folderPath });
-    currentParsedLive2D = result;
+        showToast("📁 폴더 선택 완료! 스마트 분석을 시작합니다...");
+        if (btnAnalyzeL2D) {
+          btnAnalyzeL2D.click();
+        }
+      }
+    } catch (err) {
+      showToast(`폴더 선택 실패: ${err}`, true);
+    }
+  });
+}
 
-    detectedModelFile.textContent = result.model_filename;
-    detectedMotionCount.textContent = result.motion_groups.length;
+if (btnAnalyzeL2D) {
+  btnAnalyzeL2D.addEventListener("click", async () => {
+    const folderPath = inputL2DFolder.value.trim();
+    if (!folderPath) {
+      showToast("Live2D 모델 폴더 경로를 입력해 주세요.", true);
+      return;
+    }
 
-    // Populate Select Options
-    for (const [state, selectEl] of Object.entries(mapSelects)) {
-      selectEl.innerHTML = "";
-      result.motion_groups.forEach((group) => {
-        const opt = document.createElement("option");
-        opt.value = group;
-        opt.textContent = group;
-        selectEl.appendChild(opt);
+    try {
+      btnAnalyzeL2D.textContent = "분석 중...";
+      btnAnalyzeL2D.disabled = true;
+
+      const result = await invoke("parse_live2d_folder", { folderPath });
+      currentParsedLive2D = result;
+
+      if (detectedModelFile) detectedModelFile.textContent = result.model_filename;
+      if (detectedMotionCount) {
+        detectedMotionCount.textContent = result.motion_groups.length > 0
+          ? `${result.motion_groups.length}개`
+          : "0개 (기본 물리/호흡 모드)";
+      }
+
+      // Populate Select Options
+      for (const [state, selectEl] of Object.entries(mapSelects)) {
+        if (!selectEl) continue;
+        selectEl.innerHTML = "";
+
+        // Default option for idle physics / no motion
+        const defaultOpt = document.createElement("option");
+        defaultOpt.value = "";
+        defaultOpt.textContent = result.motion_groups.length === 0
+          ? "(기본 물리/호흡 대기 - 개별 모션 없음)"
+          : "(모션 없음 / 기본 대기)";
+        selectEl.appendChild(defaultOpt);
+
+        result.motion_groups.forEach((group) => {
+          const opt = document.createElement("option");
+          opt.value = group;
+          opt.textContent = group;
+          selectEl.appendChild(opt);
+        });
+
+        // Set suggested mapping
+        const suggested = result.suggested_mapping[state];
+        if (suggested && result.motion_groups.includes(suggested)) {
+          selectEl.value = suggested;
+        } else {
+          selectEl.value = "";
+        }
+      }
+
+      if (l2dMappingSection) l2dMappingSection.classList.remove("hidden");
+      if (btnSaveLive2D) btnSaveLive2D.disabled = false;
+      if (result.motion_groups.length === 0) {
+        showToast("✨ Live2D 모델 감지 완료! (기본 물리/호흡 모드로 등록 가능)");
+      } else if (result.is_4k) {
+        showToast(`✨ 4K 초고화질 및 ${result.motion_groups.length}개 모션 자동 감지 완료!`);
+      } else {
+        showToast(`✨ Live2D 모델 및 ${result.motion_groups.length}개 모션 자동 감지 완료!`);
+      }
+    } catch (err) {
+      showToast(`분석 실패: ${err}`, true);
+      if (l2dMappingSection) l2dMappingSection.classList.add("hidden");
+      if (btnSaveLive2D) btnSaveLive2D.disabled = true;
+    } finally {
+      btnAnalyzeL2D.textContent = "🔍 스마트 분석";
+      btnAnalyzeL2D.disabled = false;
+    }
+  });
+}
+
+if (formLive2D) {
+  formLive2D.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!currentParsedLive2D) {
+      showToast("먼저 스마트 분석을 완료해 주세요.", true);
+      return;
+    }
+
+    const id = inputL2DId.value.trim().toLowerCase();
+    const name = inputL2DName.value.trim();
+
+    // 중복 ID 덮어쓰기 확인
+    if (knownCharacterIds.has(id)) {
+      const ok = confirm(`"${id}" ID를 가진 캐릭터가 이미 존재합니다.\n해당 캐릭터의 설정과 모델 파일을 덮어쓰시겠습니까?`);
+      if (!ok) return;
+    }
+
+    const reactions = {
+      idle: {
+        motionGroup: mapSelects.idle?.value || "",
+        motionIndex: [0],
+        subtitles: ["대기 중이에요~", "쉬는 중...", "무엇이든 물어보세요!"],
+      },
+      thinking: {
+        motionGroup: mapSelects.thinking?.value || "",
+        motionIndex: [0],
+        subtitles: ["어디 보자...", "생각 중이에요!", "질문 분석 중..."],
+      },
+      busy: {
+        motionGroup: mapSelects.busy?.value || "",
+        motionIndex: [0],
+        subtitles: ["열심히 코딩 중이에요! 🪄", "작업 실행 중!"],
+      },
+      talking: {
+        motionGroup: mapSelects.talking?.value || "",
+        motionIndex: [0],
+        subtitles: ["작업 완료! 확인해 주세요! ✨", "다 만들었어요!"],
+      },
+      error: {
+        motionGroup: mapSelects.error?.value || "",
+        motionIndex: [0],
+        subtitles: ["어라? 에러가 발생했어요! 💦", "에러 확인 부탁드려요!"],
+      },
+      click_react: {
+        motionGroup: mapSelects.click_react?.value || "",
+        motionIndex: [0],
+        subtitles: ["화이팅이에요! 힘내세요! 💕", "오늘도 멋진 코딩 해봐요!"],
+      },
+      sleeping: {
+        motionGroup: mapSelects.sleeping?.value || "",
+        motionIndex: [0],
+        subtitles: ["Zzz... (새근새근)", "쿨쿨... 💤"],
+      },
+    };
+
+    try {
+      showToast("Live2D 모델 복사 및 등록 중...");
+      await invoke("save_live2d_character", {
+        payload: {
+          id,
+          name,
+          sourceFolder: currentParsedLive2D.model_folder,
+          modelFilename: currentParsedLive2D.model_filename,
+          reactions,
+          is_4k: currentParsedLive2D.is_4k || false,
+        },
       });
 
-      // Set suggested mapping
-      const suggested = result.suggested_mapping[state];
-      if (suggested && result.motion_groups.includes(suggested)) {
-        selectEl.value = suggested;
+      // Switch to new character
+      await invoke("set_active_character", { id });
+
+      showToast(`🎉 "${name}" Live2D 캐릭터가 등록되었습니다!`);
+      formLive2D.reset();
+      if (l2dMappingSection) l2dMappingSection.classList.add("hidden");
+      if (btnSaveLive2D) btnSaveLive2D.disabled = true;
+      currentParsedLive2D = null;
+      if (statusL2DId) {
+        statusL2DId.className = "id-status-msg";
+        statusL2DId.textContent = "";
       }
+      inputL2DId?.classList.remove("has-warning", "has-success");
+
+      switchTab("gallery");
+    } catch (err) {
+      showToast(`Live2D 등록 실패: ${err}`, true);
     }
-
-    l2dMappingSection.classList.remove("hidden");
-    btnSaveLive2D.disabled = false;
-    if (result.is_4k) {
-      showToast("✨ 4K 초고화질(4096px) 텍스처 및 모션 자동 감지 완료!");
-    } else {
-      showToast("✨ Live2D 모델 및 모션 자동 감지 완료!");
-    }
-  } catch (err) {
-    showToast(`분석 실패: ${err}`, true);
-    l2dMappingSection.classList.add("hidden");
-    btnSaveLive2D.disabled = true;
-  } finally {
-    btnAnalyzeL2D.textContent = "🔍 스마트 분석";
-    btnAnalyzeL2D.disabled = false;
-  }
-});
-
-formLive2D.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!currentParsedLive2D) {
-    showToast("먼저 스마트 분석을 완료해 주세요.", true);
-    return;
-  }
-
-  const id = inputL2DId.value.trim().toLowerCase();
-  const name = inputL2DName.value.trim();
-
-  const reactions = {
-    idle: {
-      motionGroup: mapSelects.idle.value,
-      motionIndex: [0],
-      subtitles: ["대기 중이에요~", "쉬는 중...", "무엇이든 물어보세요!"],
-    },
-    thinking: {
-      motionGroup: mapSelects.thinking.value,
-      motionIndex: [0],
-      subtitles: ["어디 보자...", "생각 중이에요!", "질문 분석 중..."],
-    },
-    busy: {
-      motionGroup: mapSelects.busy.value,
-      motionIndex: [0],
-      subtitles: ["열심히 코딩 중이에요! 🪄", "작업 실행 중!"],
-    },
-    talking: {
-      motionGroup: mapSelects.talking.value,
-      motionIndex: [0],
-      subtitles: ["작업 완료! 확인해 주세요! ✨", "다 만들었어요!"],
-    },
-    error: {
-      motionGroup: mapSelects.error.value,
-      motionIndex: [0],
-      subtitles: ["어라? 에러가 발생했어요! 💦", "에러 확인 부탁드려요!"],
-    },
-    click_react: {
-      motionGroup: mapSelects.click_react.value,
-      motionIndex: [0],
-      subtitles: ["화이팅이에요! 힘내세요! 💕", "오늘도 멋진 코딩 해봐요!"],
-    },
-    sleeping: {
-      motionGroup: mapSelects.sleeping.value,
-      motionIndex: [0],
-      subtitles: ["Zzz... (새근새근)", "쿨쿨... 💤"],
-    },
-  };
-
-  try {
-    showToast("Live2D 모델 복사 및 등록 중...");
-    await invoke("save_live2d_character", {
-      payload: {
-        id,
-        name,
-        sourceFolder: currentParsedLive2D.model_folder,
-        modelFilename: currentParsedLive2D.model_filename,
-        reactions,
-        is_4k: currentParsedLive2D.is_4k || false,
-      },
-    });
-
-    // Switch to new character
-    await invoke("set_active_character", { id });
-
-    showToast(`🎉 "${name}" Live2D 캐릭터가 등록되었습니다!`);
-    formLive2D.reset();
-    l2dMappingSection.classList.add("hidden");
-    btnSaveLive2D.disabled = true;
-    currentParsedLive2D = null;
-
-    switchTab("gallery");
-  } catch (err) {
-    showToast(`Live2D 등록 실패: ${err}`, true);
-  }
-});
+  });
+}
 
 // ==========================================================================
 // Tab 4: Speech Bubble Settings
@@ -539,13 +691,13 @@ function hexToRgba(hex, alpha = 1) {
 function updateMockBubble() {
   if (!mockBubble) return;
 
-  const bgRgba = hexToRgba(bubbleBgColor.value, parseFloat(bubbleBgOpacity.value));
-  const borderColor = bubbleBorderColor.value || "rgba(255, 255, 255, 0.25)";
-  const fontSize = `${bubbleFontSize.value}px`;
-  const radius = `${bubbleBorderRadius.value}px`;
-  const hasTail = bubbleHasTail.checked;
-  const offsetY = parseInt(bubbleOffsetY.value, 10) || 0;
-  const offsetX = parseInt(bubbleOffsetX.value, 10) || 0;
+  const bgRgba = hexToRgba(bubbleBgColor?.value, parseFloat(bubbleBgOpacity?.value || "0.92"));
+  const borderColor = bubbleBorderColor?.value || "rgba(255, 255, 255, 0.25)";
+  const fontSize = `${bubbleFontSize?.value || 13}px`;
+  const radius = `${bubbleBorderRadius?.value || 14}px`;
+  const hasTail = bubbleHasTail ? bubbleHasTail.checked : true;
+  const offsetY = parseInt(bubbleOffsetY?.value || "0", 10) || 0;
+  const offsetX = parseInt(bubbleOffsetX?.value || "0", 10) || 0;
 
   mockBubble.style.background = bgRgba;
   mockBubble.style.borderColor = borderColor;
@@ -568,16 +720,20 @@ function updateMockBubble() {
 }
 
 function syncSliderLabels() {
-  const offY = parseInt(bubbleOffsetY.value, 10) || 0;
-  valBubbleOffsetY.textContent = offY > 0 ? `+${offY}px (위로)` : (offY < 0 ? `${offY}px (아래로)` : "0px (기본)");
+  if (bubbleOffsetY && valBubbleOffsetY) {
+    const offY = parseInt(bubbleOffsetY.value, 10) || 0;
+    valBubbleOffsetY.textContent = offY > 0 ? `+${offY}px (위로)` : (offY < 0 ? `${offY}px (아래로)` : "0px (기본)");
+  }
 
-  const offX = parseInt(bubbleOffsetX.value, 10) || 0;
-  valBubbleOffsetX.textContent = offX > 0 ? `+${offX}px (우측)` : (offX < 0 ? `${offX}px (좌측)` : "0px (중앙)");
+  if (bubbleOffsetX && valBubbleOffsetX) {
+    const offX = parseInt(bubbleOffsetX.value, 10) || 0;
+    valBubbleOffsetX.textContent = offX > 0 ? `+${offX}px (우측)` : (offX < 0 ? `${offX}px (좌측)` : "0px (중앙)");
+  }
 
-  valBubbleDuration.textContent = `${parseFloat(bubbleDuration.value).toFixed(1)}초`;
-  valBubbleFontSize.textContent = `${bubbleFontSize.value}px`;
-  valBubbleBgOpacity.textContent = `${Math.round(parseFloat(bubbleBgOpacity.value) * 100)}%`;
-  valBubbleBorderRadius.textContent = `${bubbleBorderRadius.value}px`;
+  if (bubbleDuration && valBubbleDuration) valBubbleDuration.textContent = `${parseFloat(bubbleDuration.value).toFixed(1)}초`;
+  if (bubbleFontSize && valBubbleFontSize) valBubbleFontSize.textContent = `${bubbleFontSize.value}px`;
+  if (bubbleBgOpacity && valBubbleBgOpacity) valBubbleBgOpacity.textContent = `${Math.round(parseFloat(bubbleBgOpacity.value) * 100)}%`;
+  if (bubbleBorderRadius && valBubbleBorderRadius) valBubbleBorderRadius.textContent = `${bubbleBorderRadius.value}px`;
 }
 
 async function loadBubbleSettingsTab() {
@@ -586,6 +742,7 @@ async function loadBubbleSettingsTab() {
     const characters = cachedBubbleConfig.characters || {};
     const activeKey = cachedBubbleConfig.activeCharacter;
 
+    if (!bubbleTargetSelect) return;
     const prevSelected = bubbleTargetSelect.value || "global";
     bubbleTargetSelect.innerHTML = `<option value="global">🌐 전역 기본값 (모든 캐릭터 공통)</option>`;
 
@@ -622,18 +779,18 @@ const FACTORY_DEFAULT_BUBBLE_SETTINGS = {
 };
 
 function applySettingsToForm(settings) {
-  bubbleAutoTrack.checked = settings.autoTrack !== false;
-  bubbleOffsetY.value = settings.offsetY ?? 0;
-  bubbleOffsetX.value = settings.offsetX ?? 0;
-  bubbleDuration.value = settings.duration ?? 3.5;
-  bubbleFontSize.value = settings.fontSize ?? 13;
-  bubbleBgColor.value = settings.bgColor || "#0f0f14";
-  bubbleBgColorText.value = settings.bgColor || "#0f0f14";
-  bubbleBgOpacity.value = settings.bgOpacity ?? 0.92;
-  bubbleBorderColor.value = settings.borderColor || "#404050";
-  bubbleBorderColorText.value = settings.borderColor || "#404050";
-  bubbleBorderRadius.value = settings.borderRadius ?? 14;
-  bubbleHasTail.checked = settings.hasTail !== false;
+  if (bubbleAutoTrack) bubbleAutoTrack.checked = settings.autoTrack !== false;
+  if (bubbleOffsetY) bubbleOffsetY.value = settings.offsetY ?? 0;
+  if (bubbleOffsetX) bubbleOffsetX.value = settings.offsetX ?? 0;
+  if (bubbleDuration) bubbleDuration.value = settings.duration ?? 3.5;
+  if (bubbleFontSize) bubbleFontSize.value = settings.fontSize ?? 13;
+  if (bubbleBgColor) bubbleBgColor.value = settings.bgColor || "#0f0f14";
+  if (bubbleBgColorText) bubbleBgColorText.value = settings.bgColor || "#0f0f14";
+  if (bubbleBgOpacity) bubbleBgOpacity.value = settings.bgOpacity ?? 0.92;
+  if (bubbleBorderColor) bubbleBorderColor.value = settings.borderColor || "#404050";
+  if (bubbleBorderColorText) bubbleBorderColorText.value = settings.borderColor || "#404050";
+  if (bubbleBorderRadius) bubbleBorderRadius.value = settings.borderRadius ?? 14;
+  if (bubbleHasTail) bubbleHasTail.checked = settings.hasTail !== false;
 
   syncSliderLabels();
   updateMockBubble();
@@ -655,9 +812,11 @@ function loadBubbleTargetSettings(targetId) {
 }
 
 // Event Listeners for Bubble Form Controls
-bubbleTargetSelect.addEventListener("change", () => {
-  loadBubbleTargetSettings(bubbleTargetSelect.value);
-});
+if (bubbleTargetSelect) {
+  bubbleTargetSelect.addEventListener("change", () => {
+    loadBubbleTargetSettings(bubbleTargetSelect.value);
+  });
+}
 
 // Slider input sync
 [
@@ -674,114 +833,128 @@ bubbleTargetSelect.addEventListener("change", () => {
   [bubbleBgOpacity, valBubbleBgOpacity, (v) => `${Math.round(parseFloat(v) * 100)}%`],
   [bubbleBorderRadius, valBubbleBorderRadius, (v) => `${v}px`],
 ].forEach(([input, label, fmt]) => {
-  input.addEventListener("input", () => {
-    label.textContent = fmt(input.value);
-    updateMockBubble();
-  });
+  if (input && label) {
+    input.addEventListener("input", () => {
+      label.textContent = fmt(input.value);
+      updateMockBubble();
+    });
+  }
 });
 
-bubbleAutoTrack.addEventListener("change", updateMockBubble);
-bubbleHasTail.addEventListener("change", updateMockBubble);
+if (bubbleAutoTrack) bubbleAutoTrack.addEventListener("change", updateMockBubble);
+if (bubbleHasTail) bubbleHasTail.addEventListener("change", updateMockBubble);
 
 // Color input sync
-bubbleBgColor.addEventListener("input", () => {
-  bubbleBgColorText.value = bubbleBgColor.value;
-  updateMockBubble();
-});
-bubbleBgColorText.addEventListener("input", () => {
-  if (/^#[0-9A-Fa-f]{6}$/.test(bubbleBgColorText.value)) {
-    bubbleBgColor.value = bubbleBgColorText.value;
+if (bubbleBgColor && bubbleBgColorText) {
+  bubbleBgColor.addEventListener("input", () => {
+    bubbleBgColorText.value = bubbleBgColor.value;
     updateMockBubble();
-  }
-});
+  });
+  bubbleBgColorText.addEventListener("input", () => {
+    if (/^#[0-9A-Fa-f]{6}$/.test(bubbleBgColorText.value)) {
+      bubbleBgColor.value = bubbleBgColorText.value;
+      updateMockBubble();
+    }
+  });
+}
 
-bubbleBorderColor.addEventListener("input", () => {
-  bubbleBorderColorText.value = bubbleBorderColor.value;
-  updateMockBubble();
-});
-bubbleBorderColorText.addEventListener("input", () => {
-  bubbleBorderColor.value = bubbleBorderColorText.value;
-  updateMockBubble();
-});
+if (bubbleBorderColor && bubbleBorderColorText) {
+  bubbleBorderColor.addEventListener("input", () => {
+    bubbleBorderColorText.value = bubbleBorderColor.value;
+    updateMockBubble();
+  });
+  bubbleBorderColorText.addEventListener("input", () => {
+    if (/^#[0-9A-Fa-f]{6}$/.test(bubbleBorderColorText.value)) {
+      bubbleBorderColor.value = bubbleBorderColorText.value;
+      updateMockBubble();
+    }
+  });
+}
 
 // Test Bubble Button
-btnTestBubble.addEventListener("click", async () => {
-  try {
-    const currentFormSettings = {
-      autoTrack: bubbleAutoTrack.checked,
-      offsetY: parseInt(bubbleOffsetY.value, 10),
-      offsetX: parseInt(bubbleOffsetX.value, 10),
-      duration: parseFloat(bubbleDuration.value),
-      fontSize: parseInt(bubbleFontSize.value, 10),
-      bgColor: bubbleBgColorText.value,
-      bgOpacity: parseFloat(bubbleBgOpacity.value),
-      borderColor: bubbleBorderColorText.value,
-      borderRadius: parseInt(bubbleBorderRadius.value, 10),
-      hasTail: bubbleHasTail.checked,
-    };
+if (btnTestBubble) {
+  btnTestBubble.addEventListener("click", async () => {
+    try {
+      const currentFormSettings = {
+        autoTrack: bubbleAutoTrack ? bubbleAutoTrack.checked : true,
+        offsetY: bubbleOffsetY ? parseInt(bubbleOffsetY.value, 10) : 0,
+        offsetX: bubbleOffsetX ? parseInt(bubbleOffsetX.value, 10) : 0,
+        duration: bubbleDuration ? parseFloat(bubbleDuration.value) : 3.5,
+        fontSize: bubbleFontSize ? parseInt(bubbleFontSize.value, 10) : 13,
+        bgColor: bubbleBgColorText ? bubbleBgColorText.value : "#0f0f14",
+        bgOpacity: bubbleBgOpacity ? parseFloat(bubbleBgOpacity.value) : 0.92,
+        borderColor: bubbleBorderColorText ? bubbleBorderColorText.value : "#404050",
+        borderRadius: bubbleBorderRadius ? parseInt(bubbleBorderRadius.value, 10) : 14,
+        hasTail: bubbleHasTail ? bubbleHasTail.checked : true,
+      };
 
-    await invoke("trigger_test_bubble", {
-      payload: {
-        text: "💬 말풍선 미리보기 테스트입니다! ✨",
-        settings: currentFormSettings,
-      },
-    });
-    showToast("오버레이 화면에 테스트 말풍선을 띄웠습니다!");
-  } catch (err) {
-    showToast(`테스트 실패: ${err}`, true);
-  }
-});
+      await invoke("trigger_test_bubble", {
+        payload: {
+          text: "💬 말풍선 미리보기 테스트입니다! ✨",
+          settings: currentFormSettings,
+        },
+      });
+      showToast("오버레이 화면에 테스트 말풍선을 띄웠습니다!");
+    } catch (err) {
+      showToast(`테스트 실패: ${err}`, true);
+    }
+  });
+}
 
 // Reset Button
-btnResetBubble.addEventListener("click", () => {
-  const targetId = bubbleTargetSelect.value;
-  if (targetId === "global") {
-    applySettingsToForm(FACTORY_DEFAULT_BUBBLE_SETTINGS);
-    showToast("말풍선 표준 기본값(Factory Default)으로 초기화되었습니다.");
-  } else {
-    const global = cachedBubbleConfig?.globalBubbleSettings || FACTORY_DEFAULT_BUBBLE_SETTINGS;
-    applySettingsToForm(global);
-    showToast("전역 기본값으로 복귀되었습니다. [설정 저장]을 누르면 적용됩니다.");
-  }
-});
+if (btnResetBubble) {
+  btnResetBubble.addEventListener("click", () => {
+    const targetId = bubbleTargetSelect ? bubbleTargetSelect.value : "global";
+    if (targetId === "global") {
+      applySettingsToForm(FACTORY_DEFAULT_BUBBLE_SETTINGS);
+      showToast("말풍선 표준 기본값(Factory Default)으로 초기화되었습니다.");
+    } else {
+      const global = cachedBubbleConfig?.globalBubbleSettings || FACTORY_DEFAULT_BUBBLE_SETTINGS;
+      applySettingsToForm(global);
+      showToast("전역 기본값으로 복귀되었습니다. [설정 저장]을 누르면 적용됩니다.");
+    }
+  });
+}
 
 // Save Bubble Settings
-formBubble.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const targetId = bubbleTargetSelect.value;
+if (formBubble) {
+  formBubble.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const targetId = bubbleTargetSelect ? bubbleTargetSelect.value : "global";
 
-  const settings = {
-    autoTrack: bubbleAutoTrack.checked,
-    offsetY: parseInt(bubbleOffsetY.value, 10),
-    offsetX: parseInt(bubbleOffsetX.value, 10),
-    duration: parseFloat(bubbleDuration.value),
-    fontSize: parseInt(bubbleFontSize.value, 10),
-    bgColor: bubbleBgColorText.value,
-    bgOpacity: parseFloat(bubbleBgOpacity.value),
-    borderColor: bubbleBorderColorText.value,
-    borderRadius: parseInt(bubbleBorderRadius.value, 10),
-    hasTail: bubbleHasTail.checked,
-  };
+    const settings = {
+      autoTrack: bubbleAutoTrack ? bubbleAutoTrack.checked : true,
+      offsetY: bubbleOffsetY ? parseInt(bubbleOffsetY.value, 10) : 0,
+      offsetX: bubbleOffsetX ? parseInt(bubbleOffsetX.value, 10) : 0,
+      duration: bubbleDuration ? parseFloat(bubbleDuration.value) : 3.5,
+      fontSize: bubbleFontSize ? parseInt(bubbleFontSize.value, 10) : 13,
+      bgColor: bubbleBgColorText ? bubbleBgColorText.value : "#0f0f14",
+      bgOpacity: bubbleBgOpacity ? parseFloat(bubbleBgOpacity.value) : 0.92,
+      borderColor: bubbleBorderColorText ? bubbleBorderColorText.value : "#404050",
+      borderRadius: bubbleBorderRadius ? parseInt(bubbleBorderRadius.value, 10) : 14,
+      hasTail: bubbleHasTail ? bubbleHasTail.checked : true,
+    };
 
-  if (targetId !== "global") {
-    settings.useCustom = true;
-  }
+    if (targetId !== "global") {
+      settings.useCustom = true;
+    }
 
-  try {
-    showToast("말풍선 설정 저장 중...");
-    await invoke("save_bubble_settings", {
-      payload: {
-        target_id: targetId,
-        settings,
-      },
-    });
+    try {
+      showToast("말풍선 설정 저장 중...");
+      await invoke("save_bubble_settings", {
+        payload: {
+          target_id: targetId,
+          settings,
+        },
+      });
 
-    cachedBubbleConfig = await invoke("get_character_configs");
-    showToast("💾 말풍선 설정이 성공적으로 저장되었습니다!");
-  } catch (err) {
-    showToast(`설정 저장 실패: ${err}`, true);
-  }
-});
+      cachedBubbleConfig = await invoke("get_character_configs");
+      showToast("💾 말풍선 설정이 성공적으로 저장되었습니다!");
+    } catch (err) {
+      showToast(`설정 저장 실패: ${err}`, true);
+    }
+  });
+}
 
 // ==========================================================================
 // Real-time Event Listener & Lifecycle Sync

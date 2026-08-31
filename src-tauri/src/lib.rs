@@ -1,7 +1,7 @@
 mod cursor_watcher;
 mod session_watcher;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use base64::prelude::*;
@@ -243,6 +243,113 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<(), Stri
     Ok(())
 }
 
+/// Opens a native folder selection dialog.
+#[tauri::command]
+fn pick_folder() -> Result<Option<String>, String> {
+    let folder = rfd::FileDialog::new()
+        .set_title("Live2D 모델 폴더 선택")
+        .pick_folder();
+    Ok(folder.map(|p| p.to_string_lossy().to_string()))
+}
+
+/// Recursively searches for *.model3.json up to max_depth levels.
+fn find_model3_json(dir: &Path, max_depth: usize) -> Option<PathBuf> {
+    if max_depth == 0 || !dir.is_dir() {
+        return None;
+    }
+
+    if let Ok(entries) = fs::read_dir(dir) {
+        let mut subdirs = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.ends_with(".model3.json") {
+                        return Some(path);
+                    }
+                }
+            } else if path.is_dir() {
+                subdirs.push(path);
+            }
+        }
+
+        for subdir in subdirs {
+            if let Some(found) = find_model3_json(&subdir, max_depth - 1) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
+/// Recursively searches for *.motion3.json files in a directory up to max_depth.
+/// Returns a list of (group_name, relative_path_string).
+fn find_motion_files(base_dir: &Path, current_dir: &Path, max_depth: usize) -> Vec<(String, String)> {
+    let mut results = Vec::new();
+    if max_depth == 0 || !current_dir.is_dir() {
+        return results;
+    }
+
+    if let Ok(entries) = fs::read_dir(current_dir) {
+        let mut subdirs = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.ends_with(".motion3.json") {
+                        let group_name = name.trim_end_matches(".motion3.json").to_string();
+                        if let Ok(rel) = path.strip_prefix(base_dir) {
+                            let rel_str = rel.to_string_lossy().replace('\\', "/");
+                            results.push((group_name, rel_str));
+                        }
+                    }
+                }
+            } else if path.is_dir() {
+                subdirs.push(path);
+            }
+        }
+
+        for subdir in subdirs {
+            results.extend(find_motion_files(base_dir, &subdir, max_depth - 1));
+        }
+    }
+    results
+}
+
+/// Recursively searches for *.exp3.json files in a directory up to max_depth.
+/// Returns a list of (expression_name, relative_path_string).
+fn find_expression_files(base_dir: &Path, current_dir: &Path, max_depth: usize) -> Vec<(String, String)> {
+    let mut results = Vec::new();
+    if max_depth == 0 || !current_dir.is_dir() {
+        return results;
+    }
+
+    if let Ok(entries) = fs::read_dir(current_dir) {
+        let mut subdirs = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.ends_with(".exp3.json") {
+                        let exp_name = name.trim_end_matches(".exp3.json").to_string();
+                        if let Ok(rel) = path.strip_prefix(base_dir) {
+                            let rel_str = rel.to_string_lossy().replace('\\', "/");
+                            results.push((exp_name, rel_str));
+                        }
+                    }
+                }
+            } else if path.is_dir() {
+                subdirs.push(path);
+            }
+        }
+
+        for subdir in subdirs {
+            results.extend(find_expression_files(base_dir, &subdir, max_depth - 1));
+        }
+    }
+    results
+}
+
 /// Parses a Live2D folder to find model3.json and motion groups.
 #[tauri::command]
 fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String> {
@@ -251,24 +358,20 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
         return Err("유효한 폴더 경로가 아닙니다.".into());
     }
 
-    // Look for *.model3.json in the directory
-    let mut model_file: Option<PathBuf> = None;
-    for entry in fs::read_dir(p).map_err(|e| e.to_string())? {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.ends_with(".model3.json") {
-                        model_file = Some(path);
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    // Look for *.model3.json in the directory (up to 3 levels deep)
+    let model_file_path = find_model3_json(p, 3)
+        .ok_or_else(|| "폴더 또는 하위 폴더 안에 *.model3.json 파일이 없습니다.".to_string())?;
 
-    let model_file_path = model_file.ok_or_else(|| "폴더 안에 *.model3.json 파일이 없습니다.".to_string())?;
-    let model_filename = model_file_path.file_name().unwrap().to_str().unwrap().to_string();
+    let model_filename = model_file_path
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    // Actual directory containing the .model3.json
+    let actual_model_dir = model_file_path.parent().unwrap_or(p);
+    let actual_folder_str = actual_model_dir.to_string_lossy().to_string();
 
     let content = fs::read_to_string(&model_file_path).map_err(|e| e.to_string())?;
     let json_val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
@@ -282,7 +385,7 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
     {
         for tex in textures {
             if let Some(rel_path) = tex.as_str() {
-                let tex_full_path = p.join(rel_path);
+                let tex_full_path = actual_model_dir.join(rel_path);
                 if is_png_4k(&tex_full_path) {
                     is_4k = true;
                     break;
@@ -292,13 +395,31 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
     }
 
     let mut motion_groups: Vec<String> = Vec::new();
+    let mut existing_motion_files: HashSet<String> = HashSet::new();
+
     if let Some(motions) = json_val
         .get("FileReferences")
         .and_then(|f| f.get("Motions"))
         .and_then(|m| m.as_object())
     {
-        for key in motions.keys() {
+        for (key, val) in motions {
             motion_groups.push(key.clone());
+            if let Some(arr) = val.as_array() {
+                for item in arr {
+                    if let Some(file_str) = item.get("File").and_then(|f| f.as_str()) {
+                        existing_motion_files.insert(file_str.replace('\\', "/"));
+                    }
+                }
+            }
+        }
+    }
+
+    // Also scan directory for loose *.motion3.json files (e.g. from Booth / VTube Studio models)
+    let loose_motions = find_motion_files(actual_model_dir, actual_model_dir, 3);
+    for (group_name, rel_path) in loose_motions {
+        let normalized = rel_path.replace('\\', "/");
+        if !existing_motion_files.contains(&normalized) && !motion_groups.contains(&group_name) {
+            motion_groups.push(group_name);
         }
     }
 
@@ -315,12 +436,21 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
         if !fallback.is_empty() && motion_groups.contains(&fallback.to_string()) {
             return fallback.to_string();
         }
-        motion_groups.first().cloned().unwrap_or_default()
+        fallback.to_string()
     };
 
-    let idle_group = find_matching(&["idle", "stand", "wait", "default"], "");
+    let idle_group = if motion_groups.is_empty() {
+        String::new()
+    } else {
+        let matched = find_matching(&["idle", "stand", "wait", "default", "scene1", "loop"], "");
+        if matched.is_empty() {
+            motion_groups.first().cloned().unwrap_or_default()
+        } else {
+            matched
+        }
+    };
     let think_group = find_matching(&["think", "look", "search", "question", "nod"], &idle_group);
-    let busy_group = find_matching(&["busy", "work", "act", "magic", "skill", "attack"], &think_group);
+    let busy_group = find_matching(&["busy", "work", "act", "magic", "skill", "attack", "scene"], &think_group);
     let talk_group = find_matching(&["talk", "speak", "cheer", "win", "joy", "happy"], &idle_group);
     let click_group = find_matching(&["tap", "touch", "click", "react", "talk"], &talk_group);
     let error_group = find_matching(&["error", "fail", "bad", "sad", "shock"], &think_group);
@@ -337,7 +467,7 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
 
     Ok(Live2DParseResult {
         model_filename,
-        model_folder: folder_path,
+        model_folder: actual_folder_str,
         motion_groups,
         suggested_mapping: mapping,
         is_4k,
@@ -345,13 +475,87 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SaveLive2DCharacterPayload {
     pub id: String,
     pub name: String,
+    #[serde(alias = "source_folder")]
     pub source_folder: String,
+    #[serde(alias = "model_filename")]
     pub model_filename: String,
     pub reactions: Value, // formatted reactions object
+    #[serde(alias = "is_4k")]
     pub is_4k: Option<bool>,
+}
+
+/// Sanitizes and normalizes Live2D filenames (e.g., non-ASCII, Chinese, Japanese) to ASCII ID-based filenames.
+fn sanitize_live2d_filenames(custom_char_dir: &Path, id: &str, model_filename: &str) -> Result<String, String> {
+    let old_model_path = custom_char_dir.join(model_filename);
+    if !old_model_path.exists() {
+        return Ok(model_filename.to_string());
+    }
+
+    let prefix = model_filename.trim_end_matches(".model3.json");
+    let is_non_ascii = !model_filename.is_ascii() || prefix != id;
+
+    if !is_non_ascii {
+        return Ok(model_filename.to_string());
+    }
+
+    let new_model_filename = format!("{}.model3.json", id);
+    let new_model_path = custom_char_dir.join(&new_model_filename);
+
+    let content = fs::read_to_string(&old_model_path).map_err(|e| e.to_string())?;
+    let mut model_json: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+
+    if let Some(file_refs) = model_json.get_mut("FileReferences").and_then(|f| f.as_object_mut()) {
+        if let Some(moc) = file_refs.get_mut("Moc").and_then(|m| m.as_str()) {
+            let new_moc = moc.replace(prefix, id);
+            file_refs.insert("Moc".to_string(), Value::String(new_moc));
+        }
+        if let Some(phy) = file_refs.get_mut("Physics").and_then(|m| m.as_str()) {
+            let new_phy = phy.replace(prefix, id);
+            file_refs.insert("Physics".to_string(), Value::String(new_phy));
+        }
+        if let Some(cdi) = file_refs.get_mut("DisplayInfo").and_then(|m| m.as_str()) {
+            let new_cdi = cdi.replace(prefix, id);
+            file_refs.insert("DisplayInfo".to_string(), Value::String(new_cdi));
+        }
+        if let Some(textures) = file_refs.get_mut("Textures").and_then(|t| t.as_array_mut()) {
+            for tex in textures {
+                if let Some(tex_str) = tex.as_str() {
+                    let new_tex = tex_str.replace(prefix, id);
+                    *tex = Value::String(new_tex);
+                }
+            }
+        }
+    }
+
+    // Rename matching files and folders on disk
+    if let Ok(entries) = fs::read_dir(custom_char_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.starts_with(prefix) && (name.len() == prefix.len() || name.chars().nth(prefix.len()) == Some('.')) {
+                    let suffix = &name[prefix.len()..];
+                    let new_name = format!("{}{}", id, suffix);
+                    let new_path = custom_char_dir.join(new_name);
+                    if path != new_path {
+                        let _ = fs::rename(&path, &new_path);
+                    }
+                }
+            }
+        }
+    }
+
+    let pretty = serde_json::to_string_pretty(&model_json).map_err(|e| e.to_string())?;
+    fs::write(&new_model_path, pretty).map_err(|e| e.to_string())?;
+
+    if old_model_path != new_model_path && old_model_path.exists() {
+        let _ = fs::remove_file(&old_model_path);
+    }
+
+    Ok(new_model_filename)
 }
 
 /// Imports and copies a Live2D character to custom_characters/<id> and registers it.
@@ -363,9 +567,73 @@ fn save_live2d_character(app: AppHandle, payload: SaveLive2DCharacterPayload) ->
     // Copy all files from source directory
     copy_dir_all(&payload.source_folder, &custom_char_dir)?;
 
+    // Sanitize non-ASCII / foreign character filenames to standard ASCII id-based filenames
+    let effective_model_filename = sanitize_live2d_filenames(&custom_char_dir, &payload.id, &payload.model_filename)
+        .unwrap_or_else(|_| payload.model_filename.clone());
+
+    // Ensure model3.json has all loose motions and expressions registered
+    let target_model_file = custom_char_dir.join(&effective_model_filename);
+    if target_model_file.exists() {
+        if let Ok(content) = fs::read_to_string(&target_model_file) {
+            if let Ok(mut model_json) = serde_json::from_str::<Value>(&content) {
+                let loose_motions = find_motion_files(&custom_char_dir, &custom_char_dir, 3);
+                let loose_exps = find_expression_files(&custom_char_dir, &custom_char_dir, 3);
+                let mut modified = false;
+
+                if let Some(file_refs) = model_json.get_mut("FileReferences").and_then(|f| f.as_object_mut()) {
+                    if !loose_motions.is_empty() {
+                        if !file_refs.contains_key("Motions") || !file_refs["Motions"].is_object() {
+                            file_refs.insert("Motions".to_string(), json!({}));
+                        }
+                        if let Some(motions_obj) = file_refs.get_mut("Motions").and_then(|m| m.as_object_mut()) {
+                            for (group_name, rel_path) in loose_motions {
+                                if !motions_obj.contains_key(&group_name) {
+                                    motions_obj.insert(
+                                        group_name,
+                                        json!([
+                                            { "File": rel_path }
+                                        ])
+                                    );
+                                    modified = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if !loose_exps.is_empty() {
+                        if !file_refs.contains_key("Expressions") || !file_refs["Expressions"].is_array() {
+                            file_refs.insert("Expressions".to_string(), json!([]));
+                        }
+                        if let Some(exps_arr) = file_refs.get_mut("Expressions").and_then(|e| e.as_array_mut()) {
+                            let existing_exp_names: HashSet<String> = exps_arr
+                                .iter()
+                                .filter_map(|e| e.get("Name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+                                .collect();
+                            for (exp_name, rel_path) in loose_exps {
+                                if !existing_exp_names.contains(&exp_name) {
+                                    exps_arr.push(json!({
+                                        "Name": exp_name,
+                                        "File": rel_path
+                                    }));
+                                    modified = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if modified {
+                    if let Ok(pretty) = serde_json::to_string_pretty(&model_json) {
+                        let _ = fs::write(&target_model_file, pretty);
+                    }
+                }
+            }
+        }
+    }
+
     let relative_model_path = format!(
         "characters/custom_characters/{}/{}",
-        payload.id, payload.model_filename
+        payload.id, effective_model_filename
     );
 
     // Update characters.json
@@ -438,7 +706,9 @@ fn delete_custom_character(app: AppHandle, id: String) -> Result<(), String> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SaveBubbleSettingsPayload {
+    #[serde(alias = "target_id")]
     pub target_id: Option<String>,
     pub settings: Value,
 }
@@ -502,6 +772,7 @@ pub fn run() {
             get_character_configs,
             set_active_character,
             save_2d_character,
+            pick_folder,
             parse_live2d_folder,
             save_live2d_character,
             delete_custom_character,

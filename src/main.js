@@ -35,6 +35,7 @@ let pendingTimeout = null;
 let busyRefreshInterval = null;
 let lastBusySubtitleTime = 0;
 let currentBusyDetail = null;
+let talkingAutoIdleTimer = null;
 
 // Busy 모션 주기 (기본 10초 쿨다운)
 let busyMotionIntervalMs = parseInt(localStorage.getItem("screenmate_busy_motion_interval") || "10", 10) * 1000;
@@ -381,6 +382,20 @@ function renderState(state, force = false, detail = null) {
     stopBusyRefresh();
   }
 
+  if (talkingAutoIdleTimer) {
+    clearTimeout(talkingAutoIdleTimer);
+    talkingAutoIdleTimer = null;
+  }
+
+  if (state === "talking") {
+    // 2D 이미지 및 Live2D 공통: 말풍선 노출 완료(4.5초) 후 자동으로 idle 대기 상태로 복귀
+    talkingAutoIdleTimer = setTimeout(() => {
+      if (currentState === "talking") {
+        renderState("idle");
+      }
+    }, 4500);
+  }
+
   console.log("[ScreenMate] state:", state, "detail:", detail);
   if (charDef.type === "live2d") {
     applyLive2DState(charDef, state, detail);
@@ -565,9 +580,11 @@ async function loadLive2D(charDef) {
     currentLive2DModel = model;
     fitModelToCanvas();
     renderState(currentState, true);
+    return true;
   } catch (err) {
     console.error("Live2D load failed:", err);
-    showSubtitle("Live2D 로드 실패!");
+    showSubtitle("⚠️ Live2D 로드 실패: " + (err?.message || err), 4000);
+    return false;
   }
 }
 
@@ -582,6 +599,7 @@ function load2DImage(charDef) {
   }
 
   renderState(currentState, true);
+  return true;
 }
 
 async function switchCharacter(key) {
@@ -590,13 +608,16 @@ async function switchCharacter(key) {
   const charDef = config.characters[key];
   charNameEl.textContent = charDef.name || key;
 
+  let success = true;
   if (charDef.type === "live2d") {
-    await loadLive2D(charDef);
+    success = await loadLive2D(charDef);
   } else {
     load2DImage(charDef);
   }
   applyBubbleStyles();
-  showSubtitle(charDef.name + " 준비 완료!", 2500);
+  if (success) {
+    showSubtitle(charDef.name + " 준비 완료!", 2500);
+  }
 }
 
 async function switchRandomCharacter() {
