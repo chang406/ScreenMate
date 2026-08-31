@@ -224,7 +224,9 @@ pub struct Live2DParseResult {
     pub model_filename: String,
     pub model_folder: String,
     pub motion_groups: Vec<String>,
+    pub expressions: Vec<String>,
     pub suggested_mapping: HashMap<String, String>,
+    pub suggested_expressions: HashMap<String, String>,
     pub is_4k: bool,
 }
 
@@ -350,7 +352,25 @@ fn find_expression_files(base_dir: &Path, current_dir: &Path, max_depth: usize) 
     results
 }
 
-/// Parses a Live2D folder to find model3.json and motion groups.
+/// Matches a candidate from list using multi-level multilingual keyword groups.
+fn match_keyword_thesaurus(candidates: &[String], keyword_groups: &[&[&str]], fallback: &str) -> String {
+    for group in keyword_groups {
+        for cand in candidates {
+            let lower = cand.to_lowercase();
+            for kw in *group {
+                if lower.contains(kw) {
+                    return cand.clone();
+                }
+            }
+        }
+    }
+    if !fallback.is_empty() && candidates.contains(&fallback.to_string()) {
+        return fallback.to_string();
+    }
+    String::new()
+}
+
+/// Parses a Live2D folder to find model3.json, motion groups, and expressions.
 #[tauri::command]
 fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String> {
     let p = Path::new(&folder_path);
@@ -394,6 +414,7 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
         }
     }
 
+    // 1. Collect motion groups
     let mut motion_groups: Vec<String> = Vec::new();
     let mut existing_motion_files: HashSet<String> = HashSet::new();
 
@@ -414,7 +435,7 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
         }
     }
 
-    // Also scan directory for loose *.motion3.json files (e.g. from Booth / VTube Studio models)
+    // Scan directory for loose *.motion3.json files
     let loose_motions = find_motion_files(actual_model_dir, actual_model_dir, 3);
     for (group_name, rel_path) in loose_motions {
         let normalized = rel_path.replace('\\', "/");
@@ -423,38 +444,96 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
         }
     }
 
-    // Auto-detect heuristic mapping
-    let find_matching = |keywords: &[&str], fallback: &str| -> String {
-        for group in &motion_groups {
-            let lower = group.to_lowercase();
-            for kw in keywords {
-                if lower.contains(kw) {
-                    return group.clone();
+    // 2. Collect expressions
+    let mut expressions: Vec<String> = Vec::new();
+    let mut existing_exp_files: HashSet<String> = HashSet::new();
+
+    if let Some(exps) = json_val
+        .get("FileReferences")
+        .and_then(|f| f.get("Expressions"))
+        .and_then(|e| e.as_array())
+    {
+        for item in exps {
+            if let Some(name) = item.get("Name").and_then(|n| n.as_str()) {
+                if !expressions.contains(&name.to_string()) {
+                    expressions.push(name.to_string());
                 }
             }
+            if let Some(file_str) = item.get("File").and_then(|f| f.as_str()) {
+                existing_exp_files.insert(file_str.replace('\\', "/"));
+            }
         }
-        if !fallback.is_empty() && motion_groups.contains(&fallback.to_string()) {
-            return fallback.to_string();
+    }
+
+    // Scan directory for loose *.exp3.json files
+    let loose_exps = find_expression_files(actual_model_dir, actual_model_dir, 3);
+    for (exp_name, rel_path) in loose_exps {
+        let normalized = rel_path.replace('\\', "/");
+        if !existing_exp_files.contains(&normalized) && !expressions.contains(&exp_name) {
+            expressions.push(exp_name);
         }
-        fallback.to_string()
-    };
+    }
+
+    // 3. Motion Thesaurus (English, Korean, Japanese, Chinese)
+    let idle_motion_kw: &[&[&str]] = &[
+        &["idle", "stand", "wait", "default", "loop", "scene1", "normal", "main"],
+        &["대기", "기본", "숨", "루프", "평상"],
+        &["待機", "通常", "デフォルト", "ポーズ", "ループ"],
+        &["待机", "默认", "平时", "循环"],
+    ];
+    let think_motion_kw: &[&[&str]] = &[
+        &["think", "look", "search", "question", "nod", "haoqi", "wonder", "curious"],
+        &["생각", "고민", "호기심", "분석", "탐색"],
+        &["考える", "思考", "疑問", "見渡す", "頷く"],
+        &["思考", "好奇", "疑问", "看看", "点头"],
+    ];
+    let busy_motion_kw: &[&[&str]] = &[
+        &["busy", "work", "act", "magic", "skill", "attack", "zhentou", "scene"],
+        &["작업", "집중", "코딩", "스킬", "공격", "베개", "일"],
+        &["作業", "仕事", "攻撃", "スキル", "魔法", "枕"],
+        &["工作", "干活", "枕头", "抱枕", "施法", "攻击"],
+    ];
+    let talk_motion_kw: &[&[&str]] = &[
+        &["talk", "speak", "cheer", "win", "joy", "happy", "qizi", "smile", "done"],
+        &["완료", "성공", "기쁨", "대화", "미소", "깃발", "말하기"],
+        &["会話", "喜び", "勝利", "話す", "笑顔", "旗", "完了"],
+        &["说话", "开心", "胜利", "聊天", "旗子", "完成"],
+    ];
+    let click_motion_kw: &[&[&str]] = &[
+        &["tap", "touch", "click", "react", "yaotou", "poke", "hit"],
+        &["터치", "클릭", "반응", "도리도리", "쓰담", "반기기"],
+        &["タッチ", "クリック", "反応", "頭揺らし", "照れ", "つつく"],
+        &["摇头", "点击", "触摸", "互动", "戳"],
+    ];
+    let error_motion_kw: &[&[&str]] = &[
+        &["error", "fail", "bad", "sad", "shock", "linghun", "cry", "panic"],
+        &["에러", "실패", "놀람", "영혼", "슬픔", "울음", "당황"],
+        &["エラー", "失敗", "驚き", "ショック", "魂", "泣き", "困る"],
+        &["灵魂", "失败", "错误", "难过", "震惊", "慌张"],
+    ];
+    let sleep_motion_kw: &[&[&str]] = &[
+        &["sleep", "rest", "down", "keshui", "bed", "zzz", "lay"],
+        &["수면", "잠", "휴식", "졸림", "꾸벅", "눕기"],
+        &["睡眠", "寝る", "おやすみ", "休憩", "居眠り", "横になる"],
+        &["瞌睡", "睡觉", "休息", "晚安", "躺下"],
+    ];
 
     let idle_group = if motion_groups.is_empty() {
         String::new()
     } else {
-        let matched = find_matching(&["idle", "stand", "wait", "default", "scene1", "loop"], "");
+        let matched = match_keyword_thesaurus(&motion_groups, idle_motion_kw, "");
         if matched.is_empty() {
             motion_groups.first().cloned().unwrap_or_default()
         } else {
             matched
         }
     };
-    let think_group = find_matching(&["think", "look", "search", "question", "nod"], &idle_group);
-    let busy_group = find_matching(&["busy", "work", "act", "magic", "skill", "attack", "scene"], &think_group);
-    let talk_group = find_matching(&["talk", "speak", "cheer", "win", "joy", "happy"], &idle_group);
-    let click_group = find_matching(&["tap", "touch", "click", "react", "talk"], &talk_group);
-    let error_group = find_matching(&["error", "fail", "bad", "sad", "shock"], &think_group);
-    let sleep_group = find_matching(&["sleep", "rest", "down"], &idle_group);
+    let think_group = match_keyword_thesaurus(&motion_groups, think_motion_kw, &idle_group);
+    let busy_group = match_keyword_thesaurus(&motion_groups, busy_motion_kw, &think_group);
+    let talk_group = match_keyword_thesaurus(&motion_groups, talk_motion_kw, &idle_group);
+    let click_group = match_keyword_thesaurus(&motion_groups, click_motion_kw, &talk_group);
+    let error_group = match_keyword_thesaurus(&motion_groups, error_motion_kw, &think_group);
+    let sleep_group = match_keyword_thesaurus(&motion_groups, sleep_motion_kw, &idle_group);
 
     let mut mapping = HashMap::new();
     mapping.insert("idle".to_string(), idle_group);
@@ -465,11 +544,74 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
     mapping.insert("error".to_string(), error_group);
     mapping.insert("sleeping".to_string(), sleep_group);
 
+    // 4. Expression Thesaurus (English, Korean, Japanese, Chinese)
+    let idle_exp_kw: &[&[&str]] = &[
+        &["normal", "default", "idle", "standard"],
+        &["기본", "평상시", "보통"],
+        &["通常", "デフォルト", "普通"],
+        &["平时", "默认", "正常"],
+    ];
+    let think_exp_kw: &[&[&str]] = &[
+        &["star_eyes", "star", "think", "look", "question", "haoqi", "sparkle", "wonder"],
+        &["별눈", "반짝", "생각", "호기심", "물음", "고민"],
+        &["キラキラ", "星目", "考える", "疑問", "見つめる", "星"],
+        &["星星眼", "星星", "好奇", "思考", "疑问", "闪亮"],
+    ];
+    let busy_exp_kw: &[&[&str]] = &[
+        &["left_hand", "right_hand", "hand", "work", "busy", "baozhen", "focus", "serious"],
+        &["손", "오른손", "왼손", "집중", "포옹", "진지"],
+        &["右手", "左手", "手", "集中", "抱き枕", "真面目"],
+        &["右手", "左手", "手", "抱枕", "专注", "认真"],
+    ];
+    let talk_exp_kw: &[&[&str]] = &[
+        &["heart_eyes", "heart", "smile", "happy", "joy", "star_eyes", "qizi", "cheer"],
+        &["하트눈", "하트", "미소", "기쁨", "웃음", "깃발", "행복"],
+        &["ハート", "笑顔", "笑い", "喜び", "目ハート", "旗", "ハッピー"],
+        &["爱心眼", "爱心", "笑", "旗子", "开心", "高兴"],
+    ];
+    let click_exp_kw: &[&[&str]] = &[
+        &["blush", "heart_eyes", "shy", "smile", "heart", "react", "wink"],
+        &["볼붉힘", "부끄", "하트", "미소", "홍조", "윙크"],
+        &["照れ", "赤面", "恥ずかしい", "ハート", "笑顔", "ウインク"],
+        &["脸红", "爱心眼", "害羞", "红晕", "眨眼"],
+    ];
+    let error_exp_kw: &[&[&str]] = &[
+        &["angry", "tears", "cry", "dark_face", "white_eyes", "blood", "sad", "shock", "dizzy"],
+        &["화남", "분노", "눈물", "울음", "어두움", "백안", "피", "당황", "어지러움"],
+        &["怒り", "涙", "泣き", "暗い", "白目", "血", "青ざめ", "ショック"],
+        &["生气", "泪", "白眼", "脸黑", "血", "哭", "怒", "震惊"],
+    ];
+    let sleep_exp_kw: &[&[&str]] = &[
+        &["dark_face", "tears", "sleep", "rest", "cry", "drowsy", "closed"],
+        &["어두움", "눈물", "수면", "잠", "졸림", "감은눈"],
+        &["暗い", "涙", "眠い", "睡眠", "居眠り", "目を閉じる"],
+        &["脸黑", "泪", "瞌睡", "睡觉", "闭眼"],
+    ];
+
+    let idle_exp = match_keyword_thesaurus(&expressions, idle_exp_kw, "");
+    let think_exp = match_keyword_thesaurus(&expressions, think_exp_kw, "");
+    let busy_exp = match_keyword_thesaurus(&expressions, busy_exp_kw, "");
+    let talk_exp = match_keyword_thesaurus(&expressions, talk_exp_kw, "");
+    let click_exp = match_keyword_thesaurus(&expressions, click_exp_kw, "");
+    let error_exp = match_keyword_thesaurus(&expressions, error_exp_kw, "");
+    let sleep_exp = match_keyword_thesaurus(&expressions, sleep_exp_kw, "");
+
+    let mut exp_mapping = HashMap::new();
+    exp_mapping.insert("idle".to_string(), idle_exp);
+    exp_mapping.insert("thinking".to_string(), think_exp);
+    exp_mapping.insert("busy".to_string(), busy_exp);
+    exp_mapping.insert("talking".to_string(), talk_exp);
+    exp_mapping.insert("click_react".to_string(), click_exp);
+    exp_mapping.insert("error".to_string(), error_exp);
+    exp_mapping.insert("sleeping".to_string(), sleep_exp);
+
     Ok(Live2DParseResult {
         model_filename,
         model_folder: actual_folder_str,
         motion_groups,
+        expressions,
         suggested_mapping: mapping,
+        suggested_expressions: exp_mapping,
         is_4k,
     })
 }

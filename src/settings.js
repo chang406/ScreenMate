@@ -55,6 +55,16 @@ const mapSelects = {
   sleeping: document.getElementById("map-sleeping"),
 };
 
+const mapExpSelects = {
+  idle: document.getElementById("map-exp-idle"),
+  thinking: document.getElementById("map-exp-thinking"),
+  busy: document.getElementById("map-exp-busy"),
+  talking: document.getElementById("map-exp-talking"),
+  error: document.getElementById("map-exp-error"),
+  click_react: document.getElementById("map-exp-click_react"),
+  sleeping: document.getElementById("map-exp-sleeping"),
+};
+
 let raw2DFiles = {
   idle: null,
   thinking: null,
@@ -502,17 +512,18 @@ if (btnAnalyzeL2D) {
 
       if (detectedModelFile) detectedModelFile.textContent = result.model_filename;
       if (detectedMotionCount) {
-        detectedMotionCount.textContent = result.motion_groups.length > 0
-          ? `${result.motion_groups.length}개`
-          : "0개 (기본 물리/호흡 모드)";
+        detectedMotionCount.textContent = `${result.motion_groups?.length || 0}개`;
+      }
+      const detectedExpCount = document.getElementById("detected-exp-count");
+      if (detectedExpCount) {
+        detectedExpCount.textContent = `${result.expressions?.length || 0}개`;
       }
 
-      // Populate Select Options
+      // Populate Motion Select Options
       for (const [state, selectEl] of Object.entries(mapSelects)) {
         if (!selectEl) continue;
         selectEl.innerHTML = "";
 
-        // Default option for idle physics / no motion
         const defaultOpt = document.createElement("option");
         defaultOpt.value = "";
         defaultOpt.textContent = result.motion_groups.length === 0
@@ -527,8 +538,8 @@ if (btnAnalyzeL2D) {
           selectEl.appendChild(opt);
         });
 
-        // Set suggested mapping
-        const suggested = result.suggested_mapping[state];
+        // Set suggested motion mapping
+        const suggested = result.suggested_mapping?.[state];
         if (suggested && result.motion_groups.includes(suggested)) {
           selectEl.value = suggested;
         } else {
@@ -536,15 +547,38 @@ if (btnAnalyzeL2D) {
         }
       }
 
+      // Populate Expression Select Options
+      const expressionsList = result.expressions || [];
+      for (const [state, expSelectEl] of Object.entries(mapExpSelects)) {
+        if (!expSelectEl) continue;
+        expSelectEl.innerHTML = "";
+
+        const defaultExpOpt = document.createElement("option");
+        defaultExpOpt.value = "";
+        defaultExpOpt.textContent = expressionsList.length === 0
+          ? "(기본 표정 - 개별 표정 없음)"
+          : "(기본 표정 / 변경 없음)";
+        expSelectEl.appendChild(defaultExpOpt);
+
+        expressionsList.forEach((expName) => {
+          const opt = document.createElement("option");
+          opt.value = expName;
+          opt.textContent = expName;
+          expSelectEl.appendChild(opt);
+        });
+
+        // Set suggested expression mapping
+        const suggestedExp = result.suggested_expressions?.[state];
+        if (suggestedExp && expressionsList.includes(suggestedExp)) {
+          expSelectEl.value = suggestedExp;
+        } else {
+          expSelectEl.value = "";
+        }
+      }
+
       if (l2dMappingSection) l2dMappingSection.classList.remove("hidden");
       if (btnSaveLive2D) btnSaveLive2D.disabled = false;
-      if (result.motion_groups.length === 0) {
-        showToast("✨ Live2D 모델 감지 완료! (기본 물리/호흡 모드로 등록 가능)");
-      } else if (result.is_4k) {
-        showToast(`✨ 4K 초고화질 및 ${result.motion_groups.length}개 모션 자동 감지 완료!`);
-      } else {
-        showToast(`✨ Live2D 모델 및 ${result.motion_groups.length}개 모션 자동 감지 완료!`);
-      }
+      showToast(`✨ 모션(${result.motion_groups.length}개) & 표정(${expressionsList.length}개) 스마트 자동 분석 완료!`);
     } catch (err) {
       showToast(`분석 실패: ${err}`, true);
       if (l2dMappingSection) l2dMappingSection.classList.add("hidden");
@@ -573,42 +607,25 @@ if (formLive2D) {
       if (!ok) return;
     }
 
+    const getReaction = (state, defaultSubtitles) => {
+      const motion = mapSelects[state]?.value || "";
+      const exp = mapExpSelects[state]?.value || "";
+      return {
+        motionGroup: motion,
+        motionIndex: [0],
+        expressions: exp ? [exp] : [],
+        subtitles: defaultSubtitles,
+      };
+    };
+
     const reactions = {
-      idle: {
-        motionGroup: mapSelects.idle?.value || "",
-        motionIndex: [0],
-        subtitles: ["대기 중이에요~", "쉬는 중...", "무엇이든 물어보세요!"],
-      },
-      thinking: {
-        motionGroup: mapSelects.thinking?.value || "",
-        motionIndex: [0],
-        subtitles: ["어디 보자...", "생각 중이에요!", "질문 분석 중..."],
-      },
-      busy: {
-        motionGroup: mapSelects.busy?.value || "",
-        motionIndex: [0],
-        subtitles: ["열심히 코딩 중이에요! 🪄", "작업 실행 중!"],
-      },
-      talking: {
-        motionGroup: mapSelects.talking?.value || "",
-        motionIndex: [0],
-        subtitles: ["작업 완료! 확인해 주세요! ✨", "다 만들었어요!"],
-      },
-      error: {
-        motionGroup: mapSelects.error?.value || "",
-        motionIndex: [0],
-        subtitles: ["어라? 에러가 발생했어요! 💦", "에러 확인 부탁드려요!"],
-      },
-      click_react: {
-        motionGroup: mapSelects.click_react?.value || "",
-        motionIndex: [0],
-        subtitles: ["화이팅이에요! 힘내세요! 💕", "오늘도 멋진 코딩 해봐요!"],
-      },
-      sleeping: {
-        motionGroup: mapSelects.sleeping?.value || "",
-        motionIndex: [0],
-        subtitles: ["Zzz... (새근새근)", "쿨쿨... 💤"],
-      },
+      idle: getReaction("idle", ["대기 중이에요~", "쉬는 중...", "무엇이든 물어보세요!"]),
+      thinking: getReaction("thinking", ["어디 보자...", "생각 중이에요!", "질문 분석 중..."]),
+      busy: getReaction("busy", ["열심히 코딩 중이에요! 🪄", "작업 실행 중!"]),
+      talking: getReaction("talking", ["작업 완료! 확인해 주세요! ✨", "다 만들었어요!"]),
+      error: getReaction("error", ["어라? 에러가 발생했어요! 💦", "에러 확인 부탁드려요!"]),
+      click_react: getReaction("click_react", ["화이팅이에요! 힘내세요! 💕", "오늘도 멋진 코딩 해봐요!"]),
+      sleeping: getReaction("sleeping", ["Zzz... (새근새근)", "쿨쿨... 💤"]),
     };
 
     try {

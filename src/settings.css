@@ -757,6 +757,55 @@ input:checked + .slider:before {
   gap: 10px;
 }
 
+.mapping-grid-dual {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mapping-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.mapping-item-card:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.dual-select-row {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  max-width: 440px;
+}
+
+.select-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.select-field label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.select-field .select-box {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
 .mapping-item {
   display: flex;
   align-items: center;

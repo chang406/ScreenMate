@@ -332,12 +332,12 @@ function applyLive2DState(charDef, state, detail = null) {
     }
   }
 
-  if (reaction.expressions && Array.isArray(reaction.expressions)) {
+  if (reaction.expressions && Array.isArray(reaction.expressions) && reaction.expressions.length > 0) {
     const exp = reaction.expressions[Math.floor(Math.random() * reaction.expressions.length)];
     if (exp) {
       try { currentLive2DModel.expression(exp); } catch (e) {}
     }
-  } else if (reaction.expression !== undefined) {
+  } else if (reaction.expression !== undefined && reaction.expression !== "") {
     try { currentLive2DModel.expression(reaction.expression); } catch (e) {}
   }
 

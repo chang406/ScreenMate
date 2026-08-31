@@ -169,10 +169,10 @@
             <div class="info-alert">
               <span class="alert-icon">💡</span>
               <div class="alert-content">
-                <strong>스마트 자동 감지 & 로컬 전용 저장 (Auto-Detect)</strong>
-                <p>Live2D 모델 폴더를 선택하시면, <code>.model3.json</code> 및 하위 폴더를 자동 분석하여 7대 상태별 모션을 알아서 맞춰드립니다! (<code>custom_characters/</code>에 로컬 격리 보관)</p>
+                <strong>스마트 모션 & 표정 자동 감지 (Auto-Detect)</strong>
+                <p>Live2D 모델 폴더를 선택하시면 <code>.model3.json</code>, 모션(<code>*.motion3.json</code>) 및 표정/제스처(<code>*.exp3.json</code>)를 자동 분석하여 7대 상태별로 최적의 모션과 표정을 알아서 맞춰드립니다!</p>
                 <div class="alert-tip">
-                  📌 <strong>권장 사항</strong>: Live2D Web SDK 호환성을 위해 리깅 모델 파일명(<code>*.model3.json</code>, <code>*.moc3</code> 등)은 <strong>순수 영문(ASCII) 작성을 권장</strong>합니다. (한자/한글 등 비영문 파일명은 등록 시 영문 ID로 자동 변환됩니다.)
+                  📌 <strong>파일 명명 주의사항</strong>: Live2D Web SDK 특성상 리깅 모델/모션/표정 파일명은 <strong>순수 영문(ASCII) 작성을 권장</strong>합니다. (한글/한자/일본어 등 비영문 파일명 사용 시 플랫폼 환경에 따라 리소스 로드가 실패하거나 정상 작동하지 않을 수 있습니다. 스마트 분석기가 비영문 파일명을 자동 감지하여 영문 변환 및 안전한 매핑을 시도합니다.)
                 </div>
               </div>
             </div>
@@ -203,39 +203,109 @@
             <!-- 분석 결과 매핑 박스 (초기엔 숨김) -->
             <div id="l2d-mapping-section" class="mapping-box hidden">
               <div class="mapping-header">
-                <span class="badge-success">✓ 모델 파일 감지: <strong id="detected-model-file">-</strong></span>
-                <span class="badge-neutral">감지된 모션 그룹: <strong id="detected-motion-count">0</strong>개</span>
+                <span class="badge-success">✓ 모델: <strong id="detected-model-file">-</strong></span>
+                <span class="badge-neutral">감지된 모션: <strong id="detected-motion-count">0</strong>개</span>
+                <span class="badge-neutral">감지된 표정: <strong id="detected-exp-count">0</strong>개</span>
               </div>
 
-              <h4 class="mapping-title">상태별 모션 매핑 (자동 감지 완료 - 필요 시 변경 가능)</h4>
-              <div class="mapping-grid">
-                <div class="mapping-item">
+              <h4 class="mapping-title">상태별 모션 및 표정 매핑 (스마트 자동 추천 완료 - 필요 시 자유롭게 변경 가능)</h4>
+              <div class="mapping-grid-dual">
+                <div class="mapping-item-card">
                   <span class="state-tag">1. 대기 (idle)</span>
-                  <select id="map-idle" class="select-box"></select>
+                  <div class="dual-select-row">
+                    <div class="select-field">
+                      <label>🎬 모션</label>
+                      <select id="map-idle" class="select-box"></select>
+                    </div>
+                    <div class="select-field">
+                      <label>🎭 표정</label>
+                      <select id="map-exp-idle" class="select-box"></select>
+                    </div>
+                  </div>
                 </div>
-                <div class="mapping-item">
+
+                <div class="mapping-item-card">
                   <span class="state-tag">2. 생각 중 (thinking)</span>
-                  <select id="map-thinking" class="select-box"></select>
+                  <div class="dual-select-row">
+                    <div class="select-field">
+                      <label>🎬 모션</label>
+                      <select id="map-thinking" class="select-box"></select>
+                    </div>
+                    <div class="select-field">
+                      <label>🎭 표정</label>
+                      <select id="map-exp-thinking" class="select-box"></select>
+                    </div>
+                  </div>
                 </div>
-                <div class="mapping-item">
+
+                <div class="mapping-item-card">
                   <span class="state-tag">3. 작업 중 (busy)</span>
-                  <select id="map-busy" class="select-box"></select>
+                  <div class="dual-select-row">
+                    <div class="select-field">
+                      <label>🎬 모션</label>
+                      <select id="map-busy" class="select-box"></select>
+                    </div>
+                    <div class="select-field">
+                      <label>🎭 표정</label>
+                      <select id="map-exp-busy" class="select-box"></select>
+                    </div>
+                  </div>
                 </div>
-                <div class="mapping-item">
+
+                <div class="mapping-item-card">
                   <span class="state-tag">4. 작업 완료 (talking)</span>
-                  <select id="map-talking" class="select-box"></select>
+                  <div class="dual-select-row">
+                    <div class="select-field">
+                      <label>🎬 모션</label>
+                      <select id="map-talking" class="select-box"></select>
+                    </div>
+                    <div class="select-field">
+                      <label>🎭 표정</label>
+                      <select id="map-exp-talking" class="select-box"></select>
+                    </div>
+                  </div>
                 </div>
-                <div class="mapping-item">
+
+                <div class="mapping-item-card">
                   <span class="state-tag">5. 에러 발생 (error)</span>
-                  <select id="map-error" class="select-box"></select>
+                  <div class="dual-select-row">
+                    <div class="select-field">
+                      <label>🎬 모션</label>
+                      <select id="map-error" class="select-box"></select>
+                    </div>
+                    <div class="select-field">
+                      <label>🎭 표정</label>
+                      <select id="map-exp-error" class="select-box"></select>
+                    </div>
+                  </div>
                 </div>
-                <div class="mapping-item">
+
+                <div class="mapping-item-card">
                   <span class="state-tag">6. 터치 반응 (click_react)</span>
-                  <select id="map-click_react" class="select-box"></select>
+                  <div class="dual-select-row">
+                    <div class="select-field">
+                      <label>🎬 모션</label>
+                      <select id="map-click_react" class="select-box"></select>
+                    </div>
+                    <div class="select-field">
+                      <label>🎭 표정</label>
+                      <select id="map-exp-click_react" class="select-box"></select>
+                    </div>
+                  </div>
                 </div>
-                <div class="mapping-item">
+
+                <div class="mapping-item-card">
                   <span class="state-tag">7. 수면 모드 (sleeping)</span>
-                  <select id="map-sleeping" class="select-box"></select>
+                  <div class="dual-select-row">
+                    <div class="select-field">
+                      <label>🎬 모션</label>
+                      <select id="map-sleeping" class="select-box"></select>
+                    </div>
+                    <div class="select-field">
+                      <label>🎭 표정</label>
+                      <select id="map-exp-sleeping" class="select-box"></select>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
