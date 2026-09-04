@@ -23,6 +23,9 @@
   - 트레이 우클릭 메뉴: 캐릭터 보이기/숨기기 토글, 설정 창, 항상 위 고정 토글, 앱 종료
 - [ ] 🔴 **[P0] 완전한 오프라인 정적 번들링 (Live2D/Pixi CDN 100% 제거)** `[Small]`
   - Live2D Cubism Core 및 Pixi 라이브러리를 `src/lib/`에 로컬 포함하여 오프라인/폐쇄망 무결성 확보
+- [ ] 🔴 **[P0] 멀티 환경 커스텀 감시 경로 & AI 연결 상태 모니터링** `[Medium]` ([`docs/PRD_CUSTOM_WATCH_PATHS.md`](docs/PRD_CUSTOM_WATCH_PATHS.md))
+  - D: 드라이브 이전 사용자 및 포터블 환경 지원 (`app_config.json`의 `customWatchPaths` 동적 감시)
+  - 캐릭터 매니저 GUI 내 실시간 에이전트 연결 상태 뱃지(초록불/대기/오류) 및 로그 폴더 추가 UI
 - [ ] 🔴 **[P0] 창 위치 기억/복원 & 위치 고정(Lock)** `[Small]`
   - 앱 재시작 시 지난번 배치했던 모니터/좌표 자동 복원
   - 코딩 중 마우스 드래그 실수 방지를 위한 우클릭 메뉴의 **"위치 잠금(Lock Position)"** 기능
