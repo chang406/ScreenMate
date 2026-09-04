@@ -1,0 +1,15 @@
+{
+  "activeCharacter": "mao",
+  "globalBubbleSettings": {
+    "autoTrack": true,
+    "bgColor": "#0f0f14",
+    "bgOpacity": 0.92,
+    "borderColor": "#404050",
+    "borderRadius": 14,
+    "duration": 3.5,
+    "fontSize": 13,
+    "hasTail": true,
+    "offsetX": 0,
+    "offsetY": 0
+  }
+}

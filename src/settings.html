@@ -55,6 +55,13 @@
               <button id="refresh-gallery-btn" class="btn-secondary btn-sm">🔄 새로고침</button>
             </div>
           </div>
+          <div class="info-alert" style="margin-bottom: 20px;">
+            <span class="alert-icon">💡</span>
+            <div class="alert-content">
+              <strong>폴더 기반 자체 완결형(Self-Contained) 설정</strong>
+              <p>각 캐릭터의 대사, 모션, 말풍선 설정은 해당 캐릭터 폴더 내 <code>character.json</code>에 개별 보관됩니다. (예: <code>src/characters/.../&lt;캐릭터ID&gt;/character.json</code>)</p>
+            </div>
+          </div>
           <div id="character-grid" class="character-grid">
             <!-- 동적으로 생성되는 캐릭터 카드 목록 -->
           </div>
@@ -67,7 +74,7 @@
               <span class="alert-icon">🔒</span>
               <div class="alert-content">
                 <strong>로컬 전용 커스텀 캐릭터 (Local & Private)</strong>
-                <p>추가된 캐릭터 파일은 <code>src/characters/custom_characters/</code>에 안전하게 격리 보관되며, <code>.gitignore</code>로 보호되어 Git에 커밋되지 않습니다.</p>
+                <p>추가된 캐릭터 에셋과 설정은 <code>src/characters/custom_characters/&lt;ID&gt;/character.json</code>에 독립 저장되며, <code>.gitignore</code>로 보호되어 Git에 커밋되지 않습니다.</p>
               </div>
             </div>
 
@@ -171,6 +178,7 @@
               <div class="alert-content">
                 <strong>스마트 모션 & 표정 자동 감지 (Auto-Detect)</strong>
                 <p>Live2D 모델 폴더를 선택하시면 <code>.model3.json</code>, 모션(<code>*.motion3.json</code>) 및 표정/제스처(<code>*.exp3.json</code>)를 자동 분석하여 7대 상태별로 최적의 모션과 표정을 알아서 맞춰드립니다!</p>
+                <p style="margin-top: 6px; font-size: 12px; color: var(--text-muted, #94a3b8);">💡 등록된 모델과 모션/표정/대사 설정은 <code>src/characters/custom_characters/&lt;ID&gt;/character.json</code>에 모듈형으로 안전하게 저장됩니다.</p>
                 <div class="alert-tip">
                   📌 <strong>파일 명명 주의사항</strong>: Live2D Web SDK 특성상 리깅 모델/모션/표정 파일명은 <strong>순수 영문(ASCII) 작성을 권장</strong>합니다. (한글/한자/일본어 등 비영문 파일명 사용 시 플랫폼 환경에 따라 리소스 로드가 실패하거나 정상 작동하지 않을 수 있습니다. 스마트 분석기가 비영문 파일명을 자동 감지하여 영문 변환 및 안전한 매핑을 시도합니다.)
                 </div>

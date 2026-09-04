@@ -1,0 +1,112 @@
+{
+  "name": "Mao (Live2D 4K)",
+  "type": "live2d",
+  "modelPath": "characters/mao/Mao.model3.json",
+  "reactions": {
+    "busy": {
+      "expressions": [
+        "exp_08"
+      ],
+      "motionGroup": "Busy",
+      "motionIndex": [
+        0,
+        1
+      ],
+      "subtitles": [
+        "열심히 코딩 중이에요! 🪄",
+        "명령어 실행 중...",
+        "파일 작성 중!"
+      ]
+    },
+    "click_react": {
+      "expressions": [
+        "exp_02",
+        "exp_07",
+        "exp_03"
+      ],
+      "motionGroup": "Talk",
+      "motionIndex": [
+        0
+      ],
+      "subtitles": [
+        "화이팅이에요! 힘내세요! 💕",
+        "오늘도 멋진 코딩 해봐요!",
+        "항상 응원하고 있어요! ✨"
+      ]
+    },
+    "error": {
+      "expressions": [
+        "exp_05"
+      ],
+      "motionGroup": "Error",
+      "motionIndex": [
+        0
+      ],
+      "subtitles": [
+        "어라? 에러가 발생했어요! 💦",
+        "문제가 생긴 것 같아요!",
+        "에러 확인 부탁드려요!"
+      ]
+    },
+    "idle": {
+      "expressions": [
+        null,
+        "exp_03"
+      ],
+      "motionGroup": "Idle",
+      "motionIndex": [
+        0
+      ],
+      "subtitles": [
+        "대기 중이에요~",
+        "쉬는 중...",
+        "무엇이든 물어보세요!"
+      ]
+    },
+    "sleeping": {
+      "expressions": [
+        "exp_01"
+      ],
+      "motionGroup": "Idle",
+      "motionIndex": [
+        0
+      ],
+      "subtitles": [
+        "Zzz... (새근새근)",
+        "(조는 중...)",
+        "쿨쿨... 💤"
+      ]
+    },
+    "talking": {
+      "expressions": [
+        "exp_06",
+        "exp_02",
+        "exp_03"
+      ],
+      "motionGroup": "Talk",
+      "motionIndex": [
+        0,
+        1
+      ],
+      "subtitles": [
+        "작업 완료! 확인해 주세요! ✨",
+        "쨘! 다 만들었어요!",
+        "결과 나왔어요! 어때요?"
+      ]
+    },
+    "thinking": {
+      "expressions": [
+        "exp_01"
+      ],
+      "motionGroup": "Think",
+      "motionIndex": [
+        0
+      ],
+      "subtitles": [
+        "어디 보자...",
+        "생각 중이에요!",
+        "질문 분석 중..."
+      ]
+    }
+  }
+}

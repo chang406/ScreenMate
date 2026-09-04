@@ -35,37 +35,31 @@ src/characters/custom_characters/
 - `talking.png` (완료 상태)
 > 💡 **스마트 폴백**: 7가지 상태를 다 채울 필요 없이 **기본 3장(`idle`, `thinking`, `talking`)만 넣어도 완벽하게 작동**합니다! (단 1장만 넣어도 가능)
 
-### Step 3. `src/characters.json`에 등록
-1. `my_bot/character_snippet.json`의 내용을 복사합니다.
-2. `src/characters.json` 파일을 열고 `"characters"` 객체 안에 붙여넣습니다:
+### Step 3. `character.json` 설정 (자동 인식)
+더 이상 최상단 `characters.json`을 직접 수정할 필요가 없습니다!
+`my_bot/character.json` 파일을 열고 캐릭터 이름과 원하는 대사를 작성하면 끝납니다:
 ```json
 {
-  "activeCharacter": "my_bot",
-  "characters": {
-    "mao": { ... },
-    "pixel_cat": { ... },
-    "my_bot": {
-      "name": "나만의 도트 봇",
-      "type": "image",
-      "states": {
-        "idle": {
-          "src": "characters/custom_characters/my_bot/idle.png",
-          "subtitles": ["대기 중이에요~", "무엇이든 물어보세요!"]
-        },
-        "thinking": {
-          "src": "characters/custom_characters/my_bot/thinking.png",
-          "subtitles": ["생각 중이에요...", "분석하고 있어요!"]
-        },
-        "talking": {
-          "src": "characters/custom_characters/my_bot/talking.png",
-          "subtitles": ["작업 완료! 확인해 보세요! ✨", "다 만들었어요!"]
-        }
-      }
+  "name": "나만의 도트 봇",
+  "type": "image",
+  "states": {
+    "idle": {
+      "src": "characters/custom_characters/my_bot/idle.png",
+      "subtitles": ["대기 중이에요~", "무엇이든 물어보세요!"]
+    },
+    "thinking": {
+      "src": "characters/custom_characters/my_bot/thinking.png",
+      "subtitles": ["생각 중이에요...", "분석하고 있어요!"]
+    },
+    "talking": {
+      "src": "characters/custom_characters/my_bot/talking.png",
+      "subtitles": ["작업 완료! 확인해 보세요! ✨", "다 만들었어요!"]
     }
   }
 }
 ```
-3. `"activeCharacter": "my_bot"`으로 변경하고 프로그램을 실행하면 바로 적용됩니다!
+> 🚀 **폴더 기반 자동 인식 (Self-Contained Mod Architecture)**:
+> ScreenMate 백엔드가 실행 시 `custom_characters/` 하위 폴더들을 자동 스캔하므로, 폴더 안에 `character.json`만 있으면 즉시 캐릭터 매니저와 선택 메뉴에 나타납니다!
 
 ---
 

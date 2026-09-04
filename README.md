@@ -118,13 +118,14 @@ ScreenMate는 **GUI 캐릭터 매니저**를 통해 코딩이나 JSON 수정 없
 
 ---
 
-### 🛠️ 방법 2: 수동 추가 (`src/characters.json`)
+### 🛠️ 방법 2: 폴더 기반 모듈형 수동 추가 (폴더 내 `character.json`)
 
-고급 커스터마이징이나 JSON을 직접 다루고 싶다면 수동으로도 등록할 수 있습니다.
+고급 커스터마이징이나 JSON을 직접 다루고 싶다면 폴더 기반으로 자유롭게 등록할 수 있습니다.  
+ScreenMate는 **폴더 기반 자체 완결형(Self-Contained Mod) 아키텍처**를 지원하므로, 최상단 `characters.json`을 일일이 수정할 필요 없이 **각 캐릭터 폴더 안에 `character.json` 파일만 넣어두면 앱 실행 시 100% 자동 감지(Auto-Detect)**됩니다.
 
 #### 🛡️ 개인 커스텀 캐릭터 (Git 커밋 방지 & 템플릿 제공)
 개인적으로 좋아하는 게임/애니 캐릭터를 로컬에서만 사용하고 싶다면, **`src/characters/custom_characters/`** 폴더를 이용하세요!
-- **초간단 템플릿 제공**: `src/characters/custom_characters/_template/` 폴더를 복사하여 이미지 3장(`idle`, `thinking`, `talking`)만 넣으면 바로 완성됩니다.
+- **초간단 템플릿 제공**: `src/characters/custom_characters/_template/` 폴더를 복사하여 이미지 3장(`idle`, `thinking`, `talking`)과 `character.json`만 넣으면 바로 완성됩니다.
 - **Git 자동 보호**: `custom_characters/*`의 개인 캐릭터 폴더는 `.gitignore`에 의해 **GitHub 원격 저장소에 절대 커밋/푸시되지 않습니다.**
 - 📖 **자세한 7대 상태 가이드 및 팁**: [custom_characters/README.md](src/characters/custom_characters/README.md) 참조
 
@@ -132,22 +133,17 @@ ScreenMate는 **GUI 캐릭터 매니저**를 통해 코딩이나 JSON 수정 없
 
 ### 1️⃣ 2D 이미지 캐릭터 추가 예시
 
-`src/characters/custom_characters/_template`을 복사해 `my_bot` 폴더를 만들고 이미지를 넣은 뒤 `src/characters.json`에 추가:
+`src/characters/custom_characters/_template`을 복사해 `my_bot` 폴더를 만들고 이미지를 넣은 뒤, **`src/characters/custom_characters/my_bot/character.json`** 작성:
 
 ```json
 {
-  "activeCharacter": "my_bot",
-  "characters": {
-    "my_bot": {
-      "name": "나만의 도트 봇",
-      "type": "image",
-      "states": {
-        "idle": { "src": "characters/custom_characters/my_bot/idle.png", "subtitles": ["대기 중"] },
-        "thinking": { "src": "characters/custom_characters/my_bot/work.gif", "subtitles": ["작업 중!"] },
-        "talking": { "src": "characters/custom_characters/my_bot/done.png", "subtitles": ["완료!"] }
-        // busy, error, click_react 등 누락된 상태는 자동으로 thinking/talking/idle로 대체(스마트 폴백)됩니다.
-      }
-    }
+  "name": "나만의 도트 봇",
+  "type": "image",
+  "states": {
+    "idle": { "src": "characters/custom_characters/my_bot/idle.png", "subtitles": ["대기 중"] },
+    "thinking": { "src": "characters/custom_characters/my_bot/work.gif", "subtitles": ["작업 중!"] },
+    "talking": { "src": "characters/custom_characters/my_bot/done.png", "subtitles": ["완료!"] }
+    // busy, error, click_react 등 누락된 상태는 자동으로 thinking/talking/idle로 대체(스마트 폴백)됩니다.
   }
 }
 ```
@@ -156,38 +152,33 @@ ScreenMate는 **GUI 캐릭터 매니저**를 통해 코딩이나 JSON 수정 없
 
 ### 2️⃣ Live2D 모델 추가 예시
 
-`src/characters/custom_characters/my_live2d/` 폴더에 Live2D 모델 에셋을 넣고 `src/characters.json`에 추가:
+`src/characters/custom_characters/my_live2d/` 폴더에 Live2D 모델 에셋을 넣고, **`src/characters/custom_characters/my_live2d/character.json`** 작성:
 
 ```json
 {
-  "activeCharacter": "my_live2d",
-  "characters": {
-    "my_live2d": {
-      "name": "나만의 Live2D",
-      "type": "live2d",
-      "modelPath": "characters/custom_characters/my_live2d/model.model3.json",
-      "reactions": {
-        "idle": {
-          "motionGroup": "Idle",
-          "motionIndex": [0],
-          "subtitles": ["대기 중이에요~"]
-        },
-        "thinking": {
-          "motionGroup": "Think",
-          "motionIndex": [0],
-          "subtitles": ["생각 중..."]
-        },
-        "busy": {
-          "motionGroup": "Busy",
-          "motionIndex": [0],
-          "subtitles": ["작업 실행 중!"]
-        },
-        "talking": {
-          "motionGroup": "Talk",
-          "motionIndex": [0],
-          "subtitles": ["작업 완료! ✨"]
-        }
-      }
+  "name": "나만의 Live2D",
+  "type": "live2d",
+  "modelPath": "characters/custom_characters/my_live2d/model.model3.json",
+  "reactions": {
+    "idle": {
+      "motionGroup": "Idle",
+      "motionIndex": [0],
+      "subtitles": ["대기 중이에요~"]
+    },
+    "thinking": {
+      "motionGroup": "Think",
+      "motionIndex": [0],
+      "subtitles": ["생각 중..."]
+    },
+    "busy": {
+      "motionGroup": "Busy",
+      "motionIndex": [0],
+      "subtitles": ["작업 실행 중!"]
+    },
+    "talking": {
+      "motionGroup": "Talk",
+      "motionIndex": [0],
+      "subtitles": ["작업 완료! ✨"]
     }
   }
 }
@@ -219,11 +210,12 @@ ScreenMate/
     ├── settings.html              # 캐릭터 매니저 GUI 설정 창
     ├── settings.css               # 설정 창 글래스모피즘 스타일
     ├── settings.js                # 갤러리/2D/스마트 Live2D/말풍선 커스텀 로직
-    ├── characters.json            # 캐릭터 설정 및 대사/모션 매핑
-    └── characters/                # 캐릭터 에셋
-        ├── mao/                   # (4K Live2D Mao 모델 에셋 일체)
-        ├── wanko/                 # (Live2D 완코 강아지 모델 및 모션 일체)
-        ├── pixel_cat/             # (2D 냥이 SVG 6종)
+    ├── characters.json            # 공개 참조용 스키마 템플릿 (Sample Guide)
+    ├── app_config.example.json    # 앱 전역 설정 예시
+    └── characters/                # 캐릭터 모듈 디렉토리
+        ├── mao/                   # (4K Live2D Mao 모델 + character.json)
+        ├── wanko/                 # (Live2D 완코 강아지 모델 + character.json)
+        ├── pixel_cat/             # (2D 냥이 SVG 6종 + character.json)
         └── custom_characters/     # (개인 로컬 전용 커스텀 캐릭터 - Git 제외)
 ```
 

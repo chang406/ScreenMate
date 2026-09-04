@@ -1,0 +1,91 @@
+{
+  "name": "완코 (Live2D Dog)",
+  "type": "live2d",
+  "modelPath": "characters/wanko/Wanko.model3.json",
+  "reactions": {
+    "busy": {
+      "motionGroup": "Busy",
+      "motionIndex": [
+        0,
+        1
+      ],
+      "subtitles": [
+        "열심히 앞발로 달리는 중! ⚡",
+        "폭풍 작업 중이다멍! 🐕💨",
+        "명령어 척척 실행 중!"
+      ]
+    },
+    "click_react": {
+      "motionGroup": "TapBody",
+      "motionIndex": [
+        0,
+        1
+      ],
+      "subtitles": [
+        "헥헥! 쓰다듬어줘서 고맙다멍! 💖",
+        "꼬리 살랑살랑~ 🐾",
+        "주인님 화이팅이다멍! ✨"
+      ]
+    },
+    "error": {
+      "motionGroup": "Error",
+      "motionIndex": [
+        0,
+        1
+      ],
+      "subtitles": [
+        "낑... 에러가 났어요 💦",
+        "어라? 문제가 생겼다멍! 🐶💔",
+        "에러 로그를 확인해 주세요!"
+      ]
+    },
+    "idle": {
+      "motionGroup": "Idle",
+      "motionIndex": [
+        0,
+        1
+      ],
+      "subtitles": [
+        "멍멍! 대기 중이다멍~ 🐾",
+        "킁킁... 쉬는 중!",
+        "주인님, 무슨 일 있으신가요? 🐶"
+      ]
+    },
+    "sleeping": {
+      "motionGroup": "Sleep",
+      "motionIndex": [
+        0
+      ],
+      "subtitles": [
+        "쿨쿨... 드르렁... 💤",
+        "Zzz... 멍... (낮잠 중)",
+        "코오... 🐾"
+      ]
+    },
+    "talking": {
+      "motionGroup": "Talk",
+      "motionIndex": [
+        0,
+        1,
+        2
+      ],
+      "subtitles": [
+        "왕! 작업 다 끝났다멍! 🎉",
+        "성공적으로 완료했어요! 🦴✨",
+        "쨘! 결과 확인해 주세요 멍!"
+      ]
+    },
+    "thinking": {
+      "motionGroup": "Think",
+      "motionIndex": [
+        0,
+        1
+      ],
+      "subtitles": [
+        "킁킁... 열심히 냄새 맡는 중! 🔍",
+        "골똘히 생각 중이다멍...",
+        "어디 보자... 🐾"
+      ]
+    }
+  }
+}

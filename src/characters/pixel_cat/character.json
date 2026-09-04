@@ -1,0 +1,55 @@
+{
+  "name": "냥이 (2D Cat)",
+  "type": "image",
+  "states": {
+    "busy": {
+      "src": "characters/pixel_cat/busy.svg",
+      "subtitles": [
+        "타타탓! 코딩 중이다냥! ⚡",
+        "작업 폭풍 실행 중!"
+      ]
+    },
+    "click_react": {
+      "src": "characters/pixel_cat/touch.svg",
+      "subtitles": [
+        "골골골~ 기분 좋다냥! 💖",
+        "화이팅이다냥!"
+      ]
+    },
+    "error": {
+      "src": "characters/pixel_cat/error.svg",
+      "subtitles": [
+        "하악! 에러가 났다냥! 🙀",
+        "빨간 불 떴다냥!"
+      ]
+    },
+    "idle": {
+      "src": "characters/pixel_cat/idle.svg",
+      "subtitles": [
+        "(골골골...)",
+        "대기 중이다냥"
+      ]
+    },
+    "sleeping": {
+      "src": "characters/pixel_cat/idle.svg",
+      "subtitles": [
+        "쿨쿨... 냥... 💤",
+        "(자는 중)"
+      ]
+    },
+    "talking": {
+      "src": "characters/pixel_cat/talking.svg",
+      "subtitles": [
+        "야옹! 완료했다냥! ✨",
+        "결과 나왔다냥!"
+      ]
+    },
+    "thinking": {
+      "src": "characters/pixel_cat/thinking.svg",
+      "subtitles": [
+        "(화면 집중 중)",
+        "계산 중이다냥..."
+      ]
+    }
+  }
+}

@@ -30,3 +30,7 @@ src/characters/custom_characters/*
 !src/characters/custom_characters/README.md
 !src/characters/custom_characters/_template/
 !src/characters/custom_characters/_template/**
+
+# Local runtime application config
+src/app_config.json
+

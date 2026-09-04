@@ -79,33 +79,175 @@ fn open_settings_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Gets the parsed content of `src/characters.json`.
+fn get_app_config_path(src_dir: &Path) -> PathBuf {
+    src_dir.join("app_config.json")
+}
+
+fn load_app_config(src_dir: &Path) -> Value {
+    let path = get_app_config_path(src_dir);
+    if path.exists() {
+        if let Ok(content) = fs::read_to_string(&path) {
+            if let Ok(val) = serde_json::from_str::<Value>(&content) {
+                return val;
+            }
+        }
+    }
+    // Default config if not present
+    let default_config = json!({
+        "activeCharacter": "mao",
+        "globalBubbleSettings": {
+            "autoTrack": true,
+            "bgColor": "#0f0f14",
+            "bgOpacity": 0.92,
+            "borderColor": "#404050",
+            "borderRadius": 14,
+            "duration": 3.5,
+            "fontSize": 13,
+            "hasTail": true,
+            "offsetX": 0,
+            "offsetY": 0
+        }
+    });
+    let _ = fs::write(&path, serde_json::to_string_pretty(&default_config).unwrap_or_default());
+    default_config
+}
+
+fn save_app_config(src_dir: &Path, config: &Value) -> Result<(), String> {
+    let path = get_app_config_path(src_dir);
+    let pretty = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
+    fs::write(&path, pretty).map_err(|e| e.to_string())
+}
+
+/// Finds the `character.json` file for a given character ID.
+/// Checks custom_characters first, then standard characters.
+fn find_character_json_path(src_dir: &Path, char_id: &str) -> Option<PathBuf> {
+    let custom_path = src_dir
+        .join("characters")
+        .join("custom_characters")
+        .join(char_id)
+        .join("character.json");
+    if custom_path.exists() {
+        return Some(custom_path);
+    }
+    let default_path = src_dir.join("characters").join(char_id).join("character.json");
+    if default_path.exists() {
+        return Some(default_path);
+    }
+    None
+}
+
+/// Scans character directories and merges them with app_config.json.
+/// Note: The root `characters.json` is treated as a sample/template reference only and ignored here.
 #[tauri::command]
 fn get_character_configs() -> Result<Value, String> {
     let src_dir = get_src_dir()?;
-    let json_path = src_dir.join("characters.json");
-    if !json_path.exists() {
-        return Err("characters.json not found".into());
+    let mut app_config = load_app_config(&src_dir);
+
+    let mut characters = serde_json::Map::new();
+
+    // 1. Scan public characters in src/characters/<id>/character.json (skip custom_characters)
+    let base_chars_dir = src_dir.join("characters");
+    if base_chars_dir.exists() && base_chars_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&base_chars_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let dir_name = entry.file_name().to_string_lossy().to_string();
+                    if dir_name == "custom_characters" {
+                        continue;
+                    }
+                    let char_json_path = path.join("character.json");
+                    if char_json_path.exists() {
+                        if let Ok(content) = fs::read_to_string(&char_json_path) {
+                            if let Ok(char_val) = serde_json::from_str::<Value>(&content) {
+                                characters.insert(dir_name, char_val);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
-    let content = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
-    let val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-    Ok(val)
+
+    // 2. Scan custom characters in src/characters/custom_characters/<id>/character.json (skip _template)
+    let custom_chars_dir = src_dir.join("characters").join("custom_characters");
+    if custom_chars_dir.exists() && custom_chars_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&custom_chars_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let dir_name = entry.file_name().to_string_lossy().to_string();
+                    if dir_name == "_template" {
+                        continue;
+                    }
+                    let char_json_path = path.join("character.json");
+                    if char_json_path.exists() {
+                        if let Ok(content) = fs::read_to_string(&char_json_path) {
+                            if let Ok(char_val) = serde_json::from_str::<Value>(&content) {
+                                characters.insert(dir_name, char_val);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Fallback check for activeCharacter
+    let mut active = app_config
+        .get("activeCharacter")
+        .and_then(|v| v.as_str())
+        .unwrap_or("mao")
+        .to_string();
+
+    if !characters.contains_key(&active) {
+        if characters.contains_key("mao") {
+            active = "mao".to_string();
+        } else if let Some((first_key, _)) = characters.iter().next() {
+            active = first_key.clone();
+        }
+        if let Some(obj) = app_config.as_object_mut() {
+            obj.insert("activeCharacter".to_string(), Value::String(active.clone()));
+            let _ = save_app_config(&src_dir, &app_config);
+        }
+    }
+
+    let global_bubble = app_config
+        .get("globalBubbleSettings")
+        .cloned()
+        .unwrap_or_else(|| {
+            json!({
+                "autoTrack": true,
+                "bgColor": "#0f0f14",
+                "bgOpacity": 0.92,
+                "borderColor": "#404050",
+                "borderRadius": 14,
+                "duration": 3.5,
+                "fontSize": 13,
+                "hasTail": true,
+                "offsetX": 0,
+                "offsetY": 0
+            })
+        });
+
+    Ok(json!({
+        "activeCharacter": active,
+        "characters": characters,
+        "globalBubbleSettings": global_bubble
+    }))
 }
 
 /// Sets the active character and notifies the main window.
 #[tauri::command]
 fn set_active_character(app: AppHandle, id: String) -> Result<(), String> {
     let src_dir = get_src_dir()?;
-    let json_path = src_dir.join("characters.json");
-    let content = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
-    let mut val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+    let mut app_config = load_app_config(&src_dir);
 
-    if let Some(obj) = val.as_object_mut() {
+    if let Some(obj) = app_config.as_object_mut() {
         obj.insert("activeCharacter".to_string(), Value::String(id.clone()));
     }
 
-    let updated_json = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
-    fs::write(&json_path, updated_json).map_err(|e| e.to_string())?;
+    save_app_config(&src_dir, &app_config)?;
 
     // Notify main overlay window
     let _ = app.emit("switch-character", &id);
@@ -178,24 +320,15 @@ fn save_2d_character(app: AppHandle, payload: Save2DCharacterPayload) -> Result<
         );
     }
 
-    // Update characters.json
-    let json_path = src_dir.join("characters.json");
-    let content = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
-    let mut val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-
-    if let Some(chars) = val.get_mut("characters").and_then(|c| c.as_object_mut()) {
-        chars.insert(
-            payload.id.clone(),
-            json!({
-                "name": payload.name,
-                "type": "image",
-                "states": states_map
-            }),
-        );
-    }
-
-    let updated_json = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
-    fs::write(&json_path, updated_json).map_err(|e| e.to_string())?;
+    // Save character.json inside custom_characters/<id>/
+    let char_json = json!({
+        "name": payload.name,
+        "type": "image",
+        "states": states_map
+    });
+    let char_json_path = custom_char_dir.join("character.json");
+    let updated_json = serde_json::to_string_pretty(&char_json).map_err(|e| e.to_string())?;
+    fs::write(&char_json_path, updated_json).map_err(|e| e.to_string())?;
 
     let _ = app.emit("characters-updated", ());
     Ok(())
@@ -778,33 +911,27 @@ fn save_live2d_character(app: AppHandle, payload: SaveLive2DCharacterPayload) ->
         payload.id, effective_model_filename
     );
 
-    // Update characters.json
-    let json_path = src_dir.join("characters.json");
-    let content = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
-    let mut val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-
-    if let Some(chars) = val.get_mut("characters").and_then(|c| c.as_object_mut()) {
-        let is_4k_val = payload.is_4k.unwrap_or(false);
-        let mut char_obj = json!({
-            "name": payload.name,
-            "type": "live2d",
-            "modelPath": relative_model_path,
-            "reactions": payload.reactions
-        });
-        if is_4k_val {
-            char_obj["is4k"] = json!(true);
-        }
-        chars.insert(payload.id.clone(), char_obj);
+    // Save character.json inside custom_characters/<id>/
+    let is_4k_val = payload.is_4k.unwrap_or(false);
+    let mut char_json = json!({
+        "name": payload.name,
+        "type": "live2d",
+        "modelPath": relative_model_path,
+        "reactions": payload.reactions
+    });
+    if is_4k_val {
+        char_json["is4k"] = json!(true);
     }
 
-    let updated_json = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
-    fs::write(&json_path, updated_json).map_err(|e| e.to_string())?;
+    let char_json_path = custom_char_dir.join("character.json");
+    let updated_json = serde_json::to_string_pretty(&char_json).map_err(|e| e.to_string())?;
+    fs::write(&char_json_path, updated_json).map_err(|e| e.to_string())?;
 
     let _ = app.emit("characters-updated", ());
     Ok(())
 }
 
-/// Deletes a custom character from characters.json and removes its directory.
+/// Deletes a custom character directory.
 #[tauri::command]
 fn delete_custom_character(app: AppHandle, id: String) -> Result<(), String> {
     if id == "mao" || id == "pixel_cat" || id == "wanko" {
@@ -818,30 +945,21 @@ fn delete_custom_character(app: AppHandle, id: String) -> Result<(), String> {
         let _ = fs::remove_dir_all(&custom_char_dir);
     }
 
-    let json_path = src_dir.join("characters.json");
-    let content = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
-    let mut val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
-
+    let mut app_config = load_app_config(&src_dir);
     let mut need_switch = false;
-    if let Some(active) = val.get("activeCharacter").and_then(|a| a.as_str()) {
+    if let Some(active) = app_config.get("activeCharacter").and_then(|a| a.as_str()) {
         if active == id {
             need_switch = true;
         }
     }
 
-    if let Some(chars) = val.get_mut("characters").and_then(|c| c.as_object_mut()) {
-        chars.remove(&id);
-    }
-
     if need_switch {
-        if let Some(obj) = val.as_object_mut() {
+        if let Some(obj) = app_config.as_object_mut() {
             obj.insert("activeCharacter".to_string(), Value::String("mao".to_string()));
         }
+        let _ = save_app_config(&src_dir, &app_config);
         let _ = app.emit("switch-character", "mao");
     }
-
-    let updated_json = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
-    fs::write(&json_path, updated_json).map_err(|e| e.to_string())?;
 
     let _ = app.emit("characters-updated", ());
     Ok(())
@@ -855,30 +973,36 @@ pub struct SaveBubbleSettingsPayload {
     pub settings: Value,
 }
 
-/// Saves global or character-specific speech bubble settings to characters.json.
+/// Saves global or character-specific speech bubble settings.
 #[tauri::command]
 fn save_bubble_settings(app: AppHandle, payload: SaveBubbleSettingsPayload) -> Result<(), String> {
     let src_dir = get_src_dir()?;
-    let json_path = src_dir.join("characters.json");
-    let content = fs::read_to_string(&json_path).map_err(|e| e.to_string())?;
-    let mut val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
 
     if let Some(target) = payload.target_id.as_deref() {
         if target == "global" {
-            if let Some(obj) = val.as_object_mut() {
+            let mut app_config = load_app_config(&src_dir);
+            if let Some(obj) = app_config.as_object_mut() {
                 obj.insert("globalBubbleSettings".to_string(), payload.settings);
             }
-        } else if let Some(chars) = val.get_mut("characters").and_then(|c| c.as_object_mut()) {
-            if let Some(char_def) = chars.get_mut(target).and_then(|cd| cd.as_object_mut()) {
-                char_def.insert("bubbleSettings".to_string(), payload.settings);
+            save_app_config(&src_dir, &app_config)?;
+        } else if let Some(char_json_path) = find_character_json_path(&src_dir, target) {
+            let content = fs::read_to_string(&char_json_path).map_err(|e| e.to_string())?;
+            let mut char_val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+            if let Some(obj) = char_val.as_object_mut() {
+                obj.insert("bubbleSettings".to_string(), payload.settings);
             }
+            let updated = serde_json::to_string_pretty(&char_val).map_err(|e| e.to_string())?;
+            fs::write(&char_json_path, updated).map_err(|e| e.to_string())?;
+        } else {
+            return Err(format!("캐릭터 '{}'의 설정 파일을 찾을 수 없습니다.", target));
         }
-    } else if let Some(obj) = val.as_object_mut() {
-        obj.insert("globalBubbleSettings".to_string(), payload.settings);
+    } else {
+        let mut app_config = load_app_config(&src_dir);
+        if let Some(obj) = app_config.as_object_mut() {
+            obj.insert("globalBubbleSettings".to_string(), payload.settings);
+        }
+        save_app_config(&src_dir, &app_config)?;
     }
-
-    let updated_json = serde_json::to_string_pretty(&val).map_err(|e| e.to_string())?;
-    fs::write(&json_path, updated_json).map_err(|e| e.to_string())?;
 
     let _ = app.emit("bubble-settings-updated", ());
     let _ = app.emit("characters-updated", ());

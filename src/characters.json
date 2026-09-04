@@ -1,358 +1,11 @@
 {
-  "activeCharacter": "huohuo",
+  "$comment": "참조 및 가이드용 템플릿 파일입니다. 실제 런타임 캐릭터 설정은 각 캐릭터 디렉토리(src/characters/<id>/character.json 및 src/characters/custom_characters/<id>/character.json)에서 독립 관리되며, 앱 전역 설정은 src/app_config.json에 저장됩니다.",
+  "activeCharacter": "mao",
   "characters": {
-    "huohuo": {
-      "bubbleSettings": {
-        "autoTrack": true,
-        "bgColor": "#0c1a17",
-        "bgOpacity": 0.94,
-        "borderColor": "#14b8a6",
-        "borderRadius": 15,
-        "duration": 3.8,
-        "fontSize": 13,
-        "hasTail": true,
-        "offsetX": 44,
-        "offsetY": -16,
-        "useCustom": true
-      },
-      "modelPath": "characters/custom_characters/huohuo/huohuo.model3.json",
-      "name": "곽향 / HuoHuo (Live2D)",
-      "reactions": {
-        "busy": {
-          "expressions": [
-            "baozhen"
-          ],
-          "motionGroup": "Busy",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "쿠션을 꼭 안고 집중 중이에요! 🪄",
-            "명령어 실행 중... 무서워도 힘낼게요!",
-            "열심히 코딩 중이에요! ✨"
-          ]
-        },
-        "click_react": {
-          "expressions": [
-            "angry",
-            "cry",
-            null
-          ],
-          "motionGroup": "Touch",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "깜짝이야! 저, 저를 부르셨나요...? 💦",
-            "도리도리~ 화, 화이팅이에요! 💕",
-            "쓰다듬어 주시는 건가요...?"
-          ]
-        },
-        "error": {
-          "expressions": [
-            "white_eyes",
-            "cry"
-          ],
-          "motionGroup": "Error",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "히익?! 영혼이 빠져나갈 것 같아요! 👻💦",
-            "에, 에러가 났어요! 꼬리야 살려줘!",
-            "으앙! 빨간불이 떴어요... 로그 확인해 주세요!"
-          ]
-        },
-        "idle": {
-          "expressions": [
-            null
-          ],
-          "motionGroup": "Idle",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "어... 언제든 말씀해 주세요...",
-            "귀신이 나오진 않겠죠...?",
-            "열심히 대기 중이에요... 꼬리 살랑"
-          ]
-        },
-        "sleeping": {
-          "expressions": [
-            "cry",
-            null
-          ],
-          "motionGroup": "Sleep",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "Zzz... 졸려요... 꾸벅꾸벅 💤",
-            "(조는 중...) 쿨쿨...",
-            "꼬리야... 불 꺼줘... 💤"
-          ]
-        },
-        "talking": {
-          "expressions": [
-            "qizi1",
-            "qizi2"
-          ],
-          "motionGroup": "Talk",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "해, 해냈어요! 깃발을 흔들며 완료 알림! 🚩✨",
-            "작업 완료! 꼬리야 우리 성공했어!",
-            "결과가 나왔어요! 확인해 주세요!"
-          ]
-        },
-        "thinking": {
-          "expressions": [
-            "angry",
-            null
-          ],
-          "motionGroup": "Think",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "어디 보자... 호기심 가득 관찰 중!",
-            "조, 조금만 기다려 주세요... 생각 중이에요!",
-            "부적을 꼼꼼히 확인하는 중..."
-          ]
-        }
-      },
-      "type": "live2d"
-    },
-    "jane": {
-      "is4k": true,
-      "modelPath": "characters/custom_characters/jane/jane.model3.json",
-      "name": "jane",
-      "reactions": {
-        "busy": {
-          "expressions": [
-            "left_hand"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "열심히 코딩 중이에요! 🪄",
-            "작업 실행 중!"
-          ]
-        },
-        "click_react": {
-          "expressions": [
-            "blush"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "화이팅이에요! 힘내세요! 💕",
-            "오늘도 멋진 코딩 해봐요!"
-          ]
-        },
-        "error": {
-          "expressions": [
-            "angry"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "어라? 에러가 발생했어요! 💦",
-            "에러 확인 부탁드려요!"
-          ]
-        },
-        "idle": {
-          "expressions": [],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "대기 중이에요~",
-            "쉬는 중...",
-            "무엇이든 물어보세요!"
-          ]
-        },
-        "sleeping": {
-          "expressions": [
-            "dark_face"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "Zzz... (새근새근)",
-            "쿨쿨... 💤"
-          ]
-        },
-        "talking": {
-          "expressions": [
-            "heart_eyes"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "작업 완료! 확인해 주세요! ✨",
-            "다 만들었어요!"
-          ]
-        },
-        "thinking": {
-          "expressions": [
-            "star_eyes"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "어디 보자...",
-            "생각 중이에요!",
-            "질문 분석 중..."
-          ]
-        }
-      },
-      "type": "live2d"
-    },
-    "jane_enhance": {
-      "bubbleSettings": {
-        "autoTrack": true,
-        "bgColor": "#1a0f1e",
-        "bgOpacity": 0.95,
-        "borderColor": "#e11d48",
-        "borderRadius": 14,
-        "duration": 3.8,
-        "fontSize": 13,
-        "hasTail": true,
-        "offsetX": 0,
-        "offsetY": 0,
-        "useCustom": true
-      },
-      "is4k": true,
-      "modelPath": "characters/custom_characters/jane_enhance/jane_enhance.model3.json",
-      "name": "제인 도 / Jane Doe (Enhanced)",
-      "reactions": {
-        "busy": {
-          "expressions": [
-            "left_hand",
-            "right_hand"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "특무수사팀의 실력을 보여줄게. 얌전히 기다려~ 🪄",
-            "날카롭게 파고드는 중... 도망칠 생각 마.",
-            "명령어 실행 중... 금방 깔끔하게 정리해 줄 테니까."
-          ]
-        },
-        "click_react": {
-          "expressions": [
-            "blush",
-            "heart_eyes"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "어라? 날 건드리면... 감당할 수 있겠어? 💕",
-            "후훗, 쓰다듬어 주는 거야? 기분 나쁘진 않네~",
-            "꼬리는 민감하니까 조심해... 장난은 여기까지야~"
-          ]
-        },
-        "error": {
-          "expressions": [
-            "angry",
-            "tears",
-            "dark_face"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "어머나... 발소리가 너무 컸나 봐. 함정에 걸렸네? 💦",
-            "이런... 꼬리를 밟혔잖아. 어디서 꼬인 건지 수사해 봐.",
-            "쯧, 방심했어. 빨간 에러 로그부터 차근차근 되짚어보자고."
-          ]
-        },
-        "idle": {
-          "expressions": [
-            null,
-            "blush"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "후훗, 날 그렇게 빤히 보고만 있을 거야? 얼른 코딩해야지~ 🧀",
-            "어디 보자... 오늘의 타깃은 어떤 코드일까?",
-            "심심한데... 치즈라도 한 조각 물고 올까?"
-          ]
-        },
-        "sleeping": {
-          "expressions": [
-            "dark_face",
-            "tears"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "후암... 잠복근무도 끝났으니 한숨 잘래... Zzz",
-            "조용히 해... 쥐도 낮잠은 자야 하거든... 💤"
-          ]
-        },
-        "talking": {
-          "expressions": [
-            "heart_eyes",
-            "star_eyes"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "완벽해~ 역시 날 실망시키지 않는구나, 자기? ✨",
-            "사건 해결! 이번 건은 특별히 칭찬해 줄게~ 후훗.",
-            "결과가 나왔어. 어때, 내 솜씨에 반했어? 💋"
-          ]
-        },
-        "thinking": {
-          "expressions": [
-            "star_eyes",
-            "heart_eyes"
-          ],
-          "motionGroup": "Scene1",
-          "motionIndex": [
-            0
-          ],
-          "subtitles": [
-            "어머, 흥미로운 난관이네... 행동 패턴을 분석해 볼까? 🔍",
-            "흠~ 쥐새끼처럼 숨은 버그의 흔적을 쫓는 중이야.",
-            "단서는 이미 충분해. 어떻게 요리해 줄까, 자기?"
-          ]
-        }
-      },
-      "type": "live2d"
-    },
     "mao": {
-      "modelPath": "characters/mao/Mao.model3.json",
       "name": "Mao (Live2D 4K)",
+      "type": "live2d",
+      "modelPath": "characters/mao/Mao.model3.json",
       "reactions": {
         "busy": {
           "expressions": [
@@ -459,11 +112,11 @@
             "질문 분석 중..."
           ]
         }
-      },
-      "type": "live2d"
+      }
     },
     "pixel_cat": {
       "name": "냥이 (2D Cat)",
+      "type": "image",
       "states": {
         "busy": {
           "src": "characters/pixel_cat/busy.svg",
@@ -514,12 +167,12 @@
             "계산 중이다냥..."
           ]
         }
-      },
-      "type": "image"
+      }
     },
     "wanko": {
-      "modelPath": "characters/wanko/Wanko.model3.json",
       "name": "완코 (Live2D Dog)",
+      "type": "live2d",
+      "modelPath": "characters/wanko/Wanko.model3.json",
       "reactions": {
         "busy": {
           "motionGroup": "Busy",
@@ -605,8 +258,7 @@
             "어디 보자... 🐾"
           ]
         }
-      },
-      "type": "live2d"
+      }
     }
   },
   "globalBubbleSettings": {

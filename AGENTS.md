@@ -95,12 +95,16 @@ cargo build --release
 
 ## 5. 캐릭터 추가 및 스키마 확장 가이드
 
-- **공개/기본 캐릭터**: `src/characters/<캐릭터명>/`에 배치합니다 (Mao, Wanko, 냥이 등 라이선스 안전 에셋).
-- **개인 로컬 전용 커스텀 캐릭터 (Git 커밋 방지)**: `src/characters/custom_characters/<캐릭터명>/` 폴더에 배치합니다. 이 경로는 `.gitignore`로 보호되어 실수로 원격 저장소에 업로드되지 않습니다.
-- `src/characters.json`의 `characters` 객체에 새 키를 추가합니다.
-- 예시:
+- **폴더 기반 자체 완결형(Self-Contained) 아키텍처**:
+  - 각 캐릭터는 자신의 폴더 안에 모델/이미지 에셋과 `character.json` 설정 파일을 함께 보관합니다.
+  - 앱 기동 시 Rust 백엔드가 `src/characters/` 및 `src/characters/custom_characters/` 디렉토리를 자동 스캔하여 런타임에 병합합니다.
+- **공개/기본 캐릭터**: `src/characters/<캐릭터명>/`에 배치합니다 (`mao`, `wanko`, `pixel_cat` 등 라이선스 안전 에셋).
+- **개인 로컬 전용 커스텀 캐릭터 (Git 커밋 방지)**: `src/characters/custom_characters/<캐릭터명>/` 폴더에 에셋과 `character.json`을 함께 배치합니다. 이 디렉토리는 `.gitignore`로 보호되어 원격 저장소에 업로드되지 않습니다.
+- **최상단 `src/characters.json`**: 신규 사용자를 위한 공개 참조용 스키마 템플릿(가이드) 파일입니다.
+- **런타임 앱 설정**: `src/app_config.json`에 `activeCharacter` 및 전역 말풍선 설정이 저장되며, `.gitignore`로 보호됩니다.
+- 예시 (`src/characters/custom_characters/my_bot/character.json`):
   ```json
-  "my_bot": {
+  {
     "name": "나만의 도트 봇",
     "type": "image",
     "states": {
