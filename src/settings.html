@@ -42,6 +42,10 @@
           <span class="tab-icon">💬</span>
           <span>말풍선 설정</span>
         </button>
+        <button class="tab-btn" data-tab="agent">
+          <span class="tab-icon">📡</span>
+          <span>AI 에이전트 연결</span>
+        </button>
       </nav>
 
       <!-- 탭 컨텐츠 영역 -->
@@ -471,6 +475,99 @@
                 </div>
               </div>
             </form>
+          </div>
+        </section>
+
+        <!-- 탭 5: AI 에이전트 연결 및 감시 경로 관리 -->
+        <section id="tab-agent" class="tab-pane">
+          <div class="form-container">
+            <!-- 1. 실시간 연결 상태 카드 -->
+            <div class="agent-status-card" id="agent-status-card">
+              <div class="status-indicator-area">
+                <span class="status-dot status-waiting" id="agent-status-dot"></span>
+                <div>
+                  <h3 class="status-title" id="agent-status-title">AI 에이전트 감시 대기 중...</h3>
+                  <p class="status-desc" id="agent-status-desc">세션 로그를 실시간 탐색하고 있습니다.</p>
+                </div>
+              </div>
+              <div class="status-meta" id="agent-status-meta">
+                <div class="meta-item">
+                  <span class="meta-label">활성 도구</span>
+                  <span class="meta-value badge" id="agent-tool-badge">대기 중</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">감지된 세션 파일</span>
+                  <span class="meta-value code" id="agent-session-file">없음</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. 모의 시뮬레이터 (Fixture Replay) -->
+            <div class="section-box">
+              <div class="section-box-header">
+                <h3 class="section-box-title">🧪 모의 에이전트 시뮬레이터 (미설치 도구 테스트)</h3>
+                <p class="section-box-desc">
+                  내 PC에 해당 AI 도구가 없어도, 가상 세션을 재생하여 캐릭터의 7대 반응(생각/작업/완료)을 즉시 시연 및 테스트할 수 있습니다.
+                </p>
+              </div>
+              <div class="sim-btn-group">
+                <button type="button" class="btn-secondary btn-sim" data-sim="chatgpt_codex">
+                  🤖 ChatGPT / Codex 테스트
+                </button>
+                <button type="button" class="btn-secondary btn-sim" data-sim="claude">
+                  ⚡ Claude Code 테스트
+                </button>
+                <button type="button" class="btn-secondary btn-sim" data-sim="antigravity">
+                  🪄 Antigravity 테스트
+                </button>
+              </div>
+            </div>
+
+            <!-- 3. 사용자 지정 감시 경로 (D: 드라이브 등) -->
+            <div class="section-box">
+              <div class="section-box-header">
+                <h3 class="section-box-title">📁 사용자 정의 감시 경로 (D: 드라이브 / 포터블)</h3>
+                <p class="section-box-desc">
+                  SSD 용량 관리나 별도 드라이브(D:, E: 등)에 AI 작업 공간/로그가 있는 경우 폴더를 추가하세요.
+                </p>
+              </div>
+              <div class="path-input-group">
+                <input type="text" id="custom-path-input" class="input-text flex-1" placeholder="추가할 폴더 경로를 입력하거나 [📁 폴더 찾기]를 누르세요" />
+                <button type="button" id="btn-browse-watch-path" class="btn-secondary">📁 폴더 찾기</button>
+                <button type="button" id="btn-add-watch-path" class="btn-primary">➕ 경로 추가</button>
+              </div>
+              <div class="custom-paths-list" id="custom-paths-list">
+                <!-- 동적으로 등록된 커스텀 경로 목록 -->
+              </div>
+            </div>
+
+            <!-- 4. 기본 감시 경로 진단 현황 -->
+            <div class="section-box">
+              <div class="section-box-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <h3 class="section-box-title" style="margin-bottom: 0;">🔍 기본 에이전트 감시 경로 진단</h3>
+                  <span class="privacy-badge" title="개인 로컬 사용자 경로(C:\Users\...)는 ~ 기호로 자동 마스킹되어 안전하게 보호됩니다.">🔒 안심 경로 마스킹</span>
+                </div>
+                <p class="section-box-desc">
+                  시스템에서 자동 탐색 중인 표준 AI 도구들의 기본 로그 경로 및 설치 상태입니다. (마우스를 올리면 로컬 전체 경로 툴팁이 표시됩니다)
+                </p>
+              </div>
+              <div class="watch-paths-table-container">
+                <table class="watch-table">
+                  <thead>
+                    <tr>
+                      <th>경로</th>
+                      <th>유형</th>
+                      <th>상태</th>
+                      <th>세션 수</th>
+                    </tr>
+                  </thead>
+                  <tbody id="watched-paths-tbody">
+                    <!-- 동적 테이블 행 -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </section>
       </main>

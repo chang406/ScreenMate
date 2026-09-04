@@ -1,0 +1,4 @@
+{"source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "버그를 수정해줘"}
+{"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [{"name": "replace_file_content", "args": {}}]}
+{"source": "SYSTEM", "type": "TOOL_RESULT", "content": "File modified successfully."}
+{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "버그를 완벽하게 수정했습니다! ✨"}

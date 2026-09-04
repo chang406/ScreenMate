@@ -39,8 +39,11 @@
 ## 🌟 주요 기능
 
 ### 1. 다중 AI 에이전트 실시간 감시 (Multi-Agent Auto Watcher)
-- **지원 도구**: Antigravity IDE, Antigravity CLI (`agy`), Claude Code CLI
-- **작동 원리**: 로컬 대화 로그(`transcript.jsonl`, `~/.claude/projects/`)를 150ms 초고속 tail 감시하여 가장 최근에 활성화된 세션에 자동 반응.
+- **지원 도구**: Antigravity IDE, Antigravity CLI (`agy`), Claude Code CLI, ChatGPT / Codex (신규 추가)
+- **멀티 볼륨 커스텀 감시 경로**: D:, E: 드라이브 등 사용자 정의 로그 경로 동적 등록 지원 (`src/app_config.json` 연동)
+- **모의 시뮬레이터 (Fixture Replay)**: 해당 AI 도구가 설치되지 않은 환경에서도 가상 세션을 1초 만에 재생하여 7대 캐릭터 반응 즉시 테스트
+- **화면 프라이버시 안심 마스킹**: 화면 공유/방송 시 사용자 로컬 계정명(`C:\Users\<username>`)을 `~`로 자동 마스킹 보호 (마우스 호버 시 전체 경로 툴팁)
+- **작동 원리**: 로컬 대화 로그(`transcript.jsonl`, `~/.claude/projects/` 등)를 150ms 초고속 tail 감시하여 가장 최근에 활성화된 세션에 자동 반응.
 - **7가지 세부 상태(State) 지원**:
   1. `idle` (대기): 편안한 호흡 모션 및 잔잔한 대기 대사
   2. `thinking` (생각 중): 갸웃거리며 생각하는 집중 모션 (*"어디 보자... 생각 중!"*)

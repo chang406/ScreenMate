@@ -1,6 +1,6 @@
 # 🗺️ ScreenMate 개발 로드맵 (ROADMAP.md)
 
-> 📅 **최종 업데이트**: 2026-08-31  
+> 📅 **최종 업데이트**: 2026-09-04  
 > **핵심 제품 철학**: **"초경량 데스크톱 상주 오버레이 & 완벽한 AI 에이전트 인터랙션"**  
 > 불필요한 기능 비대화를 지양하고, 데스크톱 네이티브 앱의 기본기와 시청각 피드백에 집중합니다.
 
@@ -23,9 +23,11 @@
   - 트레이 우클릭 메뉴: 캐릭터 보이기/숨기기 토글, 설정 창, 항상 위 고정 토글, 앱 종료
 - [ ] 🔴 **[P0] 완전한 오프라인 정적 번들링 (Live2D/Pixi CDN 100% 제거)** `[Small]`
   - Live2D Cubism Core 및 Pixi 라이브러리를 `src/lib/`에 로컬 포함하여 오프라인/폐쇄망 무결성 확보
-- [ ] 🔴 **[P0] 멀티 환경 커스텀 감시 경로 & AI 연결 상태 모니터링** `[Medium]` ([`docs/PRD_CUSTOM_WATCH_PATHS.md`](docs/PRD_CUSTOM_WATCH_PATHS.md))
+- [x] 🔴 **[P0] 멀티 환경 커스텀 감시 경로 & AI 연결 상태 모니터링** `[Medium]` ([`docs/PRD_CUSTOM_WATCH_PATHS.md`](docs/PRD_CUSTOM_WATCH_PATHS.md)) ✅ *(완료)*
   - D: 드라이브 이전 사용자 및 포터블 환경 지원 (`app_config.json`의 `customWatchPaths` 동적 감시)
-  - 캐릭터 매니저 GUI 내 실시간 에이전트 연결 상태 뱃지(초록불/대기/오류) 및 로그 폴더 추가 UI
+  - 다중 에이전트 어댑터 구조 (`Antigravity`, `Claude Code`, `ChatGPT / Codex`)
+  - 미설치 도구 모의 시뮬레이터(Fixture Replay) 및 화면 UI 프라이버시 안심 마스킹(`~`) 적용
+  - 캐릭터 매니저 GUI 내 실시간 에이전트 연결 상태 뱃지 및 로그 폴더 추가/진단 UI
 - [ ] 🔴 **[P0] 창 위치 기억/복원 & 위치 고정(Lock)** `[Small]`
   - 앱 재시작 시 지난번 배치했던 모니터/좌표 자동 복원
   - 코딩 중 마우스 드래그 실수 방지를 위한 우클릭 메뉴의 **"위치 잠금(Lock Position)"** 기능
@@ -109,6 +111,13 @@
 
 ## ✅ 완료된 마일스톤 (Completed Archive)
 
+- [x] **v0.2.0 코어 아키텍처 고도화 & 멀티 에이전트 확장 완성**
+  - 폴더 기반 자체 완결형(Self-Contained) 캐릭터 아키텍처 (`character.json` per folder) 및 공개 템플릿 분리
+  - 다중 에이전트 어댑터 구조 (`AgentLogAdapter` trait: Antigravity, Claude Code, ChatGPT / Codex)
+  - 멀티 볼륨 커스텀 감시 경로 (D:, E: 드라이브 등) 동적 등록 및 환경 변수(`SCREENMATE_WATCH_DIRS`) 지원
+  - 미설치 AI 도구 모의 시뮬레이터(Fixture Replay) 구축 (`replay_fixture_session`)
+  - 화면 UI 개인정보 안심 마스킹(`maskHomePath`: `C:\Users\<username>` ➡️ `~`) 및 툴팁 보호
+  - 5단 탭 GUI 캐릭터 매니저 (`📡 AI 에이전트 연결` 진단 탭 신설)
 - [x] **v0.1.0 MVP 릴리즈 완성**
   - Antigravity IDE/CLI & Claude Code 실시간 7대 상태 세션 감시 (`session_watcher.rs`)
   - Live2D 4K Mao 및 2D 냥이 SVG 멀티 캐릭터 지원 & 스마트 폴백 (`resolveFallbackState`)
@@ -118,4 +127,5 @@
   - 설정 창 백그라운드 사전 생성(Pre-warm) 아키텍처로 백화 현상 종결 및 고속 팝업
   - **Live2D 스마트 모션 & 표정(`*.exp3.json`) 복합 분석 및 4개 국어(한/영/일/중) 키워드 자동 매칭**
   - **캐릭터 매니저 GUI 듀얼 슬롯 (🎬 모션 + 🎭 표정) 매핑 확장**
+
   - **비ASCII(한자/일본어) 파일명 자동 영문 정규화(`sanitize_live2d_filenames`) 및 누락 모션/표정 자동 주입**

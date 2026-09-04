@@ -61,11 +61,20 @@ cargo build --release
   - 마우스가 투명 영역이나 빈 공간에 있으면 `invoke('set_click_through', { ignore: true })` (마우스가 뒤의 작업 창으로 통과).
 - ⚠️ **주의**: 클릭 관통 로직을 무력화하거나 CSS `pointer-events: none`만으로 대체하지 마십시오 (OS 레벨 클릭 관통이 깨집니다).
 
-### ② 세션 로그 감시 및 다중 에이전트 지원 (`session_watcher.rs`)
-- **감시 대상**:
-  - `~/.claude/projects/` (Claude Code)
-  - `~/.gemini/antigravity-ide/brain/` (Antigravity IDE)
-  - `~/.gemini/agy/logs/` & `~/.antigravity/logs/` (Antigravity CLI)
+### ② 세션 로그 감시 및 다중 에이전트 어댑터 아키텍처 (`session_watcher.rs`)
+- **다중 에이전트 어댑터 (`AgentLogAdapter` trait)**:
+  - `AntigravityAdapter`: Antigravity IDE(`~/.gemini/antigravity-ide/brain/`) 및 CLI(`~/.gemini/agy/logs/`, `~/.antigravity/logs/`)
+  - `ClaudeAdapter`: Claude Code(`~/.claude/projects/`)
+  - `ChatGptCodexAdapter`: ChatGPT / Codex CLI 세션 로그 지원
+- **탐색 경로 캐스케이딩 (우선순위)**:
+  1. `src/app_config.json`의 `customWatchPaths` (D: 드라이브, 외장 SSD 등 사용자 정의 경로)
+  2. 시스템 환경 변수 `SCREENMATE_WATCH_DIRS`
+  3. 기본 OS 홈 디렉토리 경로
+- **모의 시뮬레이터 (Fixture Replay)**:
+  - `tests/fixtures/agents/`의 샘플 세션을 통해 로컬에 AI 도구가 미설치되어 있어도 프론트엔드에서 즉시 캐릭터 리액션을 테스트 가능 (`replay_fixture_session`).
+- **프라이버시 안심 마스킹 (`maskHomePath`)**:
+  - GUI 화면에서 사용자 로컬 경로(`C:\Users\<username>`)는 `~`로 자동 마스킹 표기되며, 마우스 오버 시 실제 전체 경로 툴팁 제공.
+  - 커스텀 감시 경로는 `.gitignore`로 보호되는 로컬 `app_config.json`에만 저장되어 깃 푸시 시 노출 원천 차단.
 - **이중 파일 핑퐁 방지**: Antigravity의 `transcript_full.jsonl`은 파일 크기가 커서 오프셋 충돌을 유발하므로 **반드시 무시**하고 `transcript.jsonl`만 고정 감시해야 합니다.
 - **7가지 AgentState**:
   - `idle`: 대기 상태
@@ -75,6 +84,7 @@ cargo build --release
   - `error`: 실패 또는 에러 발생
   - `click_react`: 사용자가 캐릭터를 클릭했을 때의 반응
   - `sleeping`: 5분(300초) 이상 미활동 시 수면
+
 
 ### ③ 상태 큐잉 (State Queueing) & 최소 유지 시간
 - 짧은 명령어나 빠른 질문의 경우 `thinking` 상태가 0.1초 만에 `talking`으로 덮어써지는 문제를 방지하기 위해, `thinking` 발생 시 **최소 1.5초간 생각 모션을 보장**한 후 다음 상태(`talking` 등)로 전환하는 큐 스케줄링이 구현되어 있습니다.

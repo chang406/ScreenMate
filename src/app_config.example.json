@@ -1,5 +1,8 @@
 {
   "activeCharacter": "mao",
+  "customWatchPaths": [
+    "D:\\DevLogs\\custom_agent"
+  ],
   "globalBubbleSettings": {
     "autoTrack": true,
     "bgColor": "#0f0f14",

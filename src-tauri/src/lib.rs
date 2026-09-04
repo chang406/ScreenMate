@@ -4,6 +4,7 @@ mod session_watcher;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -95,6 +96,7 @@ fn load_app_config(src_dir: &Path) -> Value {
     // Default config if not present
     let default_config = json!({
         "activeCharacter": "mao",
+        "customWatchPaths": [],
         "globalBubbleSettings": {
             "autoTrack": true,
             "bgColor": "#0f0f14",
@@ -1027,6 +1029,109 @@ fn trigger_test_bubble(app: AppHandle, payload: Option<TestBubblePayload>) -> Re
     Ok(())
 }
 
+/// Gets the current AI agent connection status.
+#[tauri::command]
+fn get_agent_status() -> Result<session_watcher::AgentStatusInfo, String> {
+    Ok(session_watcher::get_agent_status_snapshot())
+}
+
+/// Gets the list of user-defined custom watch paths from app_config.json.
+#[tauri::command]
+fn get_custom_watch_paths() -> Result<Vec<String>, String> {
+    let src_dir = get_src_dir()?;
+    let config = load_app_config(&src_dir);
+    let paths = config
+        .get("customWatchPaths")
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(paths)
+}
+
+/// Adds a directory path to customWatchPaths in app_config.json.
+#[tauri::command]
+fn add_custom_watch_path(path: String) -> Result<(), String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("경로가 비어 있습니다.".into());
+    }
+    let src_dir = get_src_dir()?;
+    let mut config = load_app_config(&src_dir);
+    if let Some(obj) = config.as_object_mut() {
+        let entry = obj
+            .entry("customWatchPaths".to_string())
+            .or_insert_with(|| Value::Array(Vec::new()));
+        if let Some(arr) = entry.as_array_mut() {
+            let already = arr.iter().any(|v| v.as_str() == Some(trimmed));
+            if !already {
+                arr.push(Value::String(trimmed.to_string()));
+            }
+        }
+    }
+    save_app_config(&src_dir, &config)?;
+    Ok(())
+}
+
+/// Removes a directory path from customWatchPaths in app_config.json.
+#[tauri::command]
+fn remove_custom_watch_path(path: String) -> Result<(), String> {
+    let src_dir = get_src_dir()?;
+    let mut config = load_app_config(&src_dir);
+    if let Some(obj) = config.as_object_mut() {
+        if let Some(arr) = obj.get_mut("customWatchPaths").and_then(Value::as_array_mut) {
+            arr.retain(|v| v.as_str() != Some(&path));
+        }
+    }
+    save_app_config(&src_dir, &config)?;
+    Ok(())
+}
+
+/// Replays a sample agent session fixture for testing without needing the tool installed.
+#[tauri::command]
+fn replay_fixture_session(app: AppHandle, agent_id: String) -> Result<(), String> {
+    let src_dir = get_src_dir()?;
+    let project_root = src_dir.parent().unwrap_or(&src_dir);
+    let fixture_path = project_root
+        .join("tests")
+        .join("fixtures")
+        .join("agents")
+        .join(&agent_id)
+        .join("sample_session.jsonl");
+
+    if !fixture_path.exists() {
+        return Err(format!("픽스처 파일을 찾을 수 없습니다: {}", fixture_path.display()));
+    }
+
+    let content = fs::read_to_string(&fixture_path).map_err(|e| e.to_string())?;
+    let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+
+    tauri::async_runtime::spawn(async move {
+        let registry = session_watcher::AgentRegistry::new();
+        for line in lines {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if let Ok(val) = serde_json::from_str::<Value>(trimmed) {
+                if let Some((state, detail, tool)) = registry.classify(Path::new("mock.jsonl"), &val) {
+                    println!("[fixture_replay] Replaying {:?} ({:?}) for tool {}", state, detail, tool);
+                    let _ = app.emit(
+                        "state-change",
+                        session_watcher::StateChangePayload { state, detail },
+                    );
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(900)).await;
+        }
+    });
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1043,7 +1148,12 @@ pub fn run() {
             save_live2d_character,
             delete_custom_character,
             save_bubble_settings,
-            trigger_test_bubble
+            trigger_test_bubble,
+            get_agent_status,
+            get_custom_watch_paths,
+            add_custom_watch_path,
+            remove_custom_watch_path,
+            replay_fixture_session
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -1065,7 +1175,19 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                session_watcher::run(app_handle).await;
+                let get_custom_paths = || {
+                    if let Ok(src_dir) = get_src_dir() {
+                        let config = load_app_config(&src_dir);
+                        if let Some(arr) = config.get("customWatchPaths").and_then(Value::as_array) {
+                            return arr
+                                .iter()
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect();
+                        }
+                    }
+                    Vec::new()
+                };
+                session_watcher::run(app_handle, get_custom_paths).await;
             });
 
             let main_window = app

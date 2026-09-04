@@ -172,6 +172,8 @@ function switchTab(tabId) {
     loadGallery();
   } else if (tabId === "bubble") {
     loadBubbleSettingsTab();
+  } else if (tabId === "agent") {
+    loadAgentStatusTab();
   }
 }
 
@@ -981,6 +983,8 @@ function refreshActiveTab() {
   const activeTab = document.querySelector(".tab-btn.active")?.dataset.tab;
   if (activeTab === "bubble") {
     loadBubbleSettingsTab();
+  } else if (activeTab === "agent") {
+    loadAgentStatusTab();
   }
 }
 
@@ -1003,6 +1007,219 @@ window.addEventListener("focus", () => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     refreshActiveTab();
+  }
+});
+
+// ==========================================================================
+// Tab 5: AI Agent Connection & Watch Paths
+// ==========================================================================
+const agentStatusDot = document.getElementById("agent-status-dot");
+const agentStatusTitle = document.getElementById("agent-status-title");
+const agentStatusDesc = document.getElementById("agent-status-desc");
+const agentToolBadge = document.getElementById("agent-tool-badge");
+const agentSessionFile = document.getElementById("agent-session-file");
+const customPathInput = document.getElementById("custom-path-input");
+const btnBrowseWatchPath = document.getElementById("btn-browse-watch-path");
+const btnAddWatchPath = document.getElementById("btn-add-watch-path");
+const customPathsList = document.getElementById("custom-paths-list");
+const watchedPathsTbody = document.getElementById("watched-paths-tbody");
+const simBtns = document.querySelectorAll(".btn-sim");
+
+// 프라이버시 보호를 위해 로컬 사용자 홈 디렉토리(C:\Users\<username>)를 '~'로 안전하게 마스킹
+function maskHomePath(pathStr) {
+  if (!pathStr || typeof pathStr !== "string") return "-";
+  let masked = pathStr
+    .replace(/^[a-zA-Z]:[\\\/]Users[\\\/][^\\\/]+/i, "~")
+    .replace(/^\/Users\/[^\/]+/i, "~")
+    .replace(/^\/home\/[^\/]+/i, "~");
+
+  return masked.replace(/\\/g, "/");
+}
+
+function getToolDisplayName(toolId) {
+  switch (toolId) {
+    case "antigravity":
+      return "Antigravity (IDE / CLI)";
+    case "claude":
+      return "Claude Code";
+    case "chatgpt_codex":
+      return "ChatGPT / Codex";
+    default:
+      return toolId || "대기 중";
+  }
+}
+
+function renderAgentStatusUI(status) {
+  if (!status) return;
+
+  if (agentStatusDot) {
+    agentStatusDot.className = "status-dot";
+    if (status.is_connected) {
+      agentStatusDot.classList.add("status-connected");
+    } else {
+      agentStatusDot.classList.add("status-waiting");
+    }
+  }
+
+  if (agentStatusTitle) {
+    if (status.is_connected) {
+      agentStatusTitle.textContent = `${getToolDisplayName(status.active_tool)} 연결됨 🟢`;
+    } else {
+      agentStatusTitle.textContent = "AI 에이전트 감시 대기 중...";
+    }
+  }
+
+  if (agentStatusDesc) {
+    if (status.is_connected) {
+      agentStatusDesc.textContent = "대화 및 명령어 세션 로그를 실시간 추적하여 캐릭터가 반응하고 있습니다.";
+    } else {
+      agentStatusDesc.textContent = "감시 대상 폴더를 150ms 주기로 탐색하고 있습니다. AI 작업을 시작하면 자동 감지됩니다.";
+    }
+  }
+
+  if (agentToolBadge) {
+    agentToolBadge.textContent = status.is_connected ? getToolDisplayName(status.active_tool) : "대기 중";
+  }
+
+  if (agentSessionFile) {
+    if (status.active_session_file) {
+      agentSessionFile.textContent = maskHomePath(status.active_session_file);
+      agentSessionFile.title = `실제 전체 경로: ${status.active_session_file}`;
+    } else {
+      agentSessionFile.textContent = "감지된 활성 세션 없음";
+      agentSessionFile.removeAttribute("title");
+    }
+  }
+
+  // 기본 및 등록된 경로 테이블 렌더링
+  if (watchedPathsTbody && Array.isArray(status.watched_paths)) {
+    watchedPathsTbody.innerHTML = status.watched_paths
+      .map((item) => {
+        const typeBadge =
+          item.source === "custom"
+            ? '<span class="badge-tag tag-custom">사용자 정의</span>'
+            : item.source === "env"
+              ? '<span class="badge-tag tag-env">환경 변수</span>'
+              : '<span class="badge-tag tag-default">기본 경로</span>';
+
+        const statusBadge = item.exists
+          ? '<span class="badge-status-ok">✓ 감지됨</span>'
+          : '<span class="badge-status-missing">✕ 미설치</span>';
+
+        const maskedPath = maskHomePath(item.path);
+
+        return `
+          <tr>
+            <td style="max-width: 280px; word-break: break-all; font-family: monospace;" title="실제 전체 경로: ${item.path}">${maskedPath}</td>
+            <td>${typeBadge}</td>
+            <td>${statusBadge}</td>
+            <td>${item.session_count}개</td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+}
+
+async function renderCustomPathsList() {
+  if (!customPathsList) return;
+  try {
+    const paths = await invoke("get_custom_watch_paths");
+    if (!paths || paths.length === 0) {
+      customPathsList.innerHTML = '<div class="empty-paths-msg">등록된 사용자 정의 경로가 없습니다. (기본 표준 경로로 자동 감시 중)</div>';
+      return;
+    }
+
+    customPathsList.innerHTML = paths
+      .map(
+        (p) => `
+      <div class="custom-path-item" title="실제 전체 경로: ${p}">
+        <span>📁 ${maskHomePath(p)}</span>
+        <button type="button" class="btn-remove-path" data-path="${encodeURIComponent(p)}" title="경로 제거">✕ 삭제</button>
+      </div>
+    `
+      )
+      .join("");
+
+    customPathsList.querySelectorAll(".btn-remove-path").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const rawPath = decodeURIComponent(btn.dataset.path);
+        try {
+          await invoke("remove_custom_watch_path", { path: rawPath });
+          showToast("감시 경로가 제거되었습니다.");
+          await loadAgentStatusTab();
+        } catch (err) {
+          showToast(`제거 실패: ${err}`, true);
+        }
+      });
+    });
+  } catch (err) {
+    console.error("Failed to load custom watch paths:", err);
+  }
+}
+
+async function loadAgentStatusTab() {
+  try {
+    const status = await invoke("get_agent_status");
+    renderAgentStatusUI(status);
+    await renderCustomPathsList();
+  } catch (err) {
+    console.error("Failed to load agent status:", err);
+  }
+}
+
+// 브라우즈 버튼
+if (btnBrowseWatchPath) {
+  btnBrowseWatchPath.addEventListener("click", async () => {
+    try {
+      const selected = await invoke("pick_folder");
+      if (selected && customPathInput) {
+        customPathInput.value = selected;
+      }
+    } catch (err) {
+      showToast(`폴더 선택 실패: ${err}`, true);
+    }
+  });
+}
+
+// 경로 추가 버튼
+if (btnAddWatchPath) {
+  btnAddWatchPath.addEventListener("click", async () => {
+    if (!customPathInput) return;
+    const path = customPathInput.value.trim();
+    if (!path) {
+      showToast("추가할 폴더 경로를 입력해주세요.", true);
+      return;
+    }
+
+    try {
+      await invoke("add_custom_watch_path", { path });
+      customPathInput.value = "";
+      showToast("📁 새 감시 경로가 성공적으로 등록되었습니다!");
+      await loadAgentStatusTab();
+    } catch (err) {
+      showToast(`경로 추가 실패: ${err}`, true);
+    }
+  });
+}
+
+// 모의 시뮬레이터 재생 버튼들
+simBtns.forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const simType = btn.dataset.sim;
+    try {
+      showToast(`🧪 [${getToolDisplayName(simType)}] 가상 세션을 재생합니다. 캐릭터 반응을 확인하세요!`);
+      await invoke("replay_fixture_session", { agentId: simType });
+    } catch (err) {
+      showToast(`시뮬레이션 실패: ${err}`, true);
+    }
+  });
+});
+
+listen("agent-status-changed", (event) => {
+  const activeTab = document.querySelector(".tab-btn.active")?.dataset.tab;
+  if (activeTab === "agent") {
+    renderAgentStatusUI(event.payload);
   }
 });
 

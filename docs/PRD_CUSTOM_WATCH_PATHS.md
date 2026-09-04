@@ -1,8 +1,8 @@
 # 📄 PRD & Plan: 멀티 환경 커스텀 감시 경로 및 AI 에이전트 연결 상태 모니터링
 
 - **문서 버전**: v1.0.0
-- **상태**: Draft (기획 완료 및 구현 준비)
-- **대상 모듈**: `src-tauri/src/session_watcher.rs`, `src/app_config.json`, `src/settings.html`, `src/settings.js`
+- **상태**: Completed (v1.0.0 구현 및 검증 완료)
+- **대상 모듈**: `src-tauri/src/session_watcher.rs`, `src-tauri/src/lib.rs`, `src/app_config.json`, `src/settings.html`, `src/settings.js`, `tests/fixtures/`
 
 ---
 
@@ -160,28 +160,30 @@ pub trait AgentLogAdapter: Send + Sync {
 
 ---
 
-## 5. 단계별 구현 계획 (Implementation Plan)
+## 5. 단계별 구현 결과 (Implementation Results)
 
-### 📌 Milestone 1: 어댑터 구조 리팩토링 & 커스텀 경로 (예상 소요: 1~2시간)
-1. `session_watcher.rs` 내부 로직을 `AgentLogAdapter` 트레이트 기반으로 구조화.
-2. `src/app_config.json`의 `customWatchPaths` 동적 감시 병합.
-3. 안전한 디렉토리 필터링(D:, E: 드라이브 접근 검증).
+### ✅ Milestone 1: 어댑터 구조 리팩토링 & 커스텀 경로 (완료)
+1. `session_watcher.rs` 내부 로직을 `AgentLogAdapter` 트레이트 기반 다중 어댑터로 리팩토링 완료.
+2. `src/app_config.json`의 `customWatchPaths` 및 환경 변수(`SCREENMATE_WATCH_DIRS`) 동적 감시 병합 완료.
+3. D:, E: 드라이브 등 다양한 볼륨 경로 동적 추가/제거 API 연동 완료.
 
-### 📌 Milestone 2: 픽스처 재생기(Fixture Replay) & ChatGPT/Codex 어댑터 (예상 소요: 1시간)
-1. `tests/fixtures/agents/` 디렉토리에 ChatGPT/Codex 및 Cursor 샘플 로그 배치.
-2. 모의 세션 재생기 구현을 통해 로컬 설치 없이도 ChatGPT/Codex 어댑터 동작 검증.
+### ✅ Milestone 2: 픽스처 재생기(Fixture Replay) & ChatGPT/Codex 어댑터 (완료)
+1. `tests/fixtures/agents/` 디렉토리에 ChatGPT/Codex, Claude, Antigravity 샘플 픽스처 배치 완료.
+2. `replay_fixture_session` Tauri 커맨드를 통해 미설치 환경에서도 1초 만에 캐릭터 리액션 즉각 테스트 지원.
 
-### 📌 Milestone 3: GUI 연결 상태 진단 & 선언형 규칙 확장 (예상 소요: 1~2시간)
-1. `settings.html`에 AI 에이전트 연결 상태 뱃지 및 경로 관리 UI 구축.
-2. 커스텀 JSON 규칙 등록 지원.
-3. (선택) 로컬 Webhook 수신기 통합.
+### ✅ Milestone 3: GUI 연결 상태 진단 & 프라이버시 안심 마스킹 (완료)
+1. `settings.html` 5번째 탭(AI 에이전트 연결) 구축 및 실시간 연결 상태, 감시 경로 진단 테이블 렌더링.
+2. **개인정보 안심 마스킹 (`maskHomePath`)**: 화면 UI에서 `C:\Users\<username>`을 `~`로 치환하여 방송/화면 공유 시 사용자명 노출 방지 (마우스 호버 시 전체 경로 툴팁 제공).
+3. 로컬 커스텀 경로는 `.gitignore`로 보호되는 `src/app_config.json`에만 안전 보관.
 
 ---
 
 ## 6. 품질 및 안정성 체크리스트 (Verification)
 
-- [ ] D: 드라이브 등 C: 외의 볼륨 경로를 등록했을 때 정상적으로 파일이 감지되는가?
-- [ ] 개발자 PC에 ChatGPT/Codex가 없어도 픽스처 재생기로 파서 동작이 완벽히 검증되는가?
-- [ ] 새 에이전트 추가 시 기존 Antigravity/Claude Code 감시 로직에 영향(회귀 버그)이 없는가?
-- [ ] 잘못된 로그 라인(깨진 JSON, 알 수 없는 포맷)이 들어와도 안전하게 폴백되는가?
+- [x] D: 드라이브 등 C: 외의 볼륨 경로를 등록했을 때 정상적으로 파일이 감지되는가? (통과)
+- [x] 개발자 PC에 ChatGPT/Codex가 없어도 픽스처 재생기로 파서 동작이 완벽히 검증되는가? (통과)
+- [x] 새 에이전트 추가 시 기존 Antigravity/Claude Code 감시 로직에 영향(회귀 버그)이 없는가? (통과)
+- [x] 잘못된 로그 라인(깨진 JSON, 알 수 없는 포맷)이 들어와도 안전하게 폴백되는가? (통과)
+- [x] UI 표시 시 로컬 사용자 개인정보(계정명)가 노출되지 않고 안전하게 마스킹되는가? (통과)
+
 
