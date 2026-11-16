@@ -255,14 +255,21 @@ const CONTEXTUAL_BUSY_SUBTITLES = {
 };
 
 function getBusySubtitle(charDef, detail) {
-  if (detail && CONTEXTUAL_BUSY_SUBTITLES[detail]) {
-    const list = CONTEXTUAL_BUSY_SUBTITLES[detail];
+  const resolved = resolveFallbackState(charDef, "busy");
+  // 1. 캐릭터 전용 도구별 맞춤 대사(edit/command/read/browse) 최우선 지원
+  if (detail && resolved?.def?.contextualSubtitles?.[detail]?.length > 0) {
+    const list = resolved.def.contextualSubtitles[detail];
     return list[Math.floor(Math.random() * list.length)];
   }
-  const resolved = resolveFallbackState(charDef, "busy");
+  // 2. 캐릭터 전용 일반 busy 대사
   const subList = resolved?.def?.subtitles;
   if (subList && subList.length > 0) {
     return subList[Math.floor(Math.random() * subList.length)];
+  }
+  // 3. 캐릭터 맞춤 대사가 없을 때의 글로벌 기본 도구별 대사 폴백
+  if (detail && CONTEXTUAL_BUSY_SUBTITLES[detail]) {
+    const list = CONTEXTUAL_BUSY_SUBTITLES[detail];
+    return list[Math.floor(Math.random() * list.length)];
   }
   return "열심히 작업 중이에요! 🪄";
 }
