@@ -19,8 +19,9 @@
         "decorations": false,
         "alwaysOnTop": true,
         "shadow": false,
-        "skipTaskbar": false,
-        "center": false
+        "skipTaskbar": true,
+        "center": false,
+        "visible": false
       },
       {
         "label": "settings",

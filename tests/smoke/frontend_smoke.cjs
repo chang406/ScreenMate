@@ -74,7 +74,7 @@ function mockTauriScript(configs) {
     (() => {
       const listeners = {};
       const configs = ${JSON.stringify(configs)};
-      window.__smoke = { invokes: [], bubbles: [] };
+      window.__smoke = { invokes: [], bubbles: [], dragCalls: 0 };
       window.__TAURI__ = {
         core: {
           invoke: async (cmd, args) => {
@@ -92,7 +92,7 @@ function mockTauriScript(configs) {
         },
         window: {
           getCurrentWindow: () => ({
-            startDragging: async () => {},
+            startDragging: async () => { window.__smoke.dragCalls++; },
             setPosition: async () => {},
           }),
         },
@@ -167,17 +167,93 @@ async function runCharacter(browser, baseUrl, key) {
   const shot = path.join(OUT, `${LABEL}_${key}.png`);
   await page.addStyleTag({ content: "html,body{background:#3b3f4a !important}" });
   await page.screenshot({ path: shot });
+
+  const interactions = await checkInteractions(page, key);
   await context.close();
 
   return {
     character: key,
     ...info,
+    interactions,
     stateLog,
     pageErrors,
     consoleErrors,
     blockedExternalRequests: blocked,
     screenshot: path.relative(ROOT, shot),
   };
+}
+
+/** Context-menu controls added after the baseline. Missing controls are reported as null. */
+async function checkInteractions(page, key) {
+  const has = (sel) => page.evaluate((s) => !!document.querySelector(s), sel);
+  const center = await page.evaluate(() => {
+    const el = [document.getElementById("image-character"), document.getElementById("live2d-canvas")].find(
+      (e) => e && !e.classList.contains("hidden")
+    );
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height * 0.75 };
+  });
+  const out = {};
+
+  // 1) 우클릭 메뉴 열기 + 스크린샷
+  await page.mouse.click(center.x, center.y, { button: "right" });
+  await page.waitForTimeout(250);
+  out.contextMenuOpens = await page.evaluate(() => !document.getElementById("context-menu").classList.contains("hidden"));
+  if (key === CHARACTERS[0]) await page.screenshot({ path: path.join(OUT, `${LABEL}_context_menu.png`) });
+
+  // 2) 크기 슬라이더
+  if (await has("#scale-slider")) {
+    out.scaleSliderTo150 = await page.evaluate(() => {
+      const s = document.getElementById("scale-slider");
+      s.value = "150";
+      s.dispatchEvent(new Event("input", { bubbles: true }));
+      return { stored: localStorage.getItem("screenmate_scale"), label: document.getElementById("scale-value").textContent };
+    });
+  } else out.scaleSliderTo150 = null;
+
+  // 3) 위치 잠금 → 드래그 시도 시 startDragging 호출 안 됨
+  const drag = async () => {
+    await page.evaluate(() => document.getElementById("context-menu").classList.add("hidden"));
+    const before = await page.evaluate(() => window.__smoke.dragCalls);
+    await page.mouse.move(center.x, center.y);
+    await page.mouse.down();
+    await page.mouse.move(center.x + 30, center.y + 30, { steps: 4 });
+    await page.mouse.up();
+    return (await page.evaluate(() => window.__smoke.dragCalls)) - before;
+  };
+  out.dragCallsUnlocked = await drag();
+  if (await has("#toggle-lock-btn")) {
+    await page.evaluate(() => document.getElementById("toggle-lock-btn").click());
+    out.lockedStored = await page.evaluate(() => localStorage.getItem("screenmate_position_locked"));
+    out.dragCallsLocked = await drag();
+    // 트레이 메뉴에서 잠금 해제 이벤트
+    await page.evaluate(() => window.__mockEmit("tray-action", "toggle_position_lock"));
+    out.unlockedViaTrayStored = await page.evaluate(() => localStorage.getItem("screenmate_position_locked"));
+  } else {
+    out.lockedStored = out.dragCallsLocked = out.unlockedViaTrayStored = null;
+  }
+
+  // 4) 효과음: 켜기 → talking 전환 시 실제 재생 호출
+  if (await page.evaluate(() => !!window.ScreenMateSfx)) {
+    out.sfx = await page.evaluate(async () => {
+      const sfx = window.ScreenMateSfx;
+      const played = [];
+      const orig = sfx.forState;
+      sfx.forState = (st) => {
+        const r = orig(st);
+        played.push([st, r]);
+        return r;
+      };
+      document.getElementById("toggle-sfx-btn").click();
+      const enabled = sfx.isEnabled();
+      window.__mockEmit("state-change", { state: "talking", detail: null });
+      await new Promise((r) => setTimeout(r, 300));
+      return { enabled, played, audioContextAvailable: !!(window.AudioContext || window.webkitAudioContext) };
+    });
+  } else out.sfx = null;
+
+  out.invokedCommands = await page.evaluate(() => [...new Set(window.__smoke.invokes)]);
+  return out;
 }
 
 (async () => {

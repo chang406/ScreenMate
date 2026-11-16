@@ -17,6 +17,18 @@ const menuSwitchCharBtn = document.getElementById("menu-switch-char-btn");
 const menuSettingsBtn = document.getElementById("menu-settings-btn");
 const menuExitBtn = document.getElementById("menu-exit-btn");
 const scaleBtns = document.querySelectorAll(".scale-btn");
+const scaleSlider = document.getElementById("scale-slider");
+const scaleValueEl = document.getElementById("scale-value");
+const toggleLockBtn = document.getElementById("toggle-lock-btn");
+const lockIconEl = document.getElementById("lock-icon");
+const lockStatusText = document.getElementById("lock-status-text");
+const toggleSfxBtn = document.getElementById("toggle-sfx-btn");
+const sfxIconEl = document.getElementById("sfx-icon");
+const sfxStatusText = document.getElementById("sfx-status-text");
+const sfxVolumeRow = document.getElementById("sfx-volume-row");
+const sfxVolumeSlider = document.getElementById("sfx-volume");
+const sfxVolumeValueEl = document.getElementById("sfx-volume-value");
+const menuHideBtn = document.getElementById("menu-hide-btn");
 const characterContainer = document.getElementById("character-container");
 
 let config = null;
@@ -43,6 +55,9 @@ let lastBusyMotionTime = 0;
 
 let currentScale = parseFloat(localStorage.getItem("screenmate_scale") || "1.0");
 let isAlwaysOnTop = localStorage.getItem("screenmate_always_on_top") !== "false";
+// 위치 잠금: 코딩 중 실수로 캐릭터를 끌어 옮기는 것을 방지 (클릭 반응은 유지)
+let isPositionLocked = localStorage.getItem("screenmate_position_locked") === "true";
+let lastLockHintTime = 0;
 
 // 말풍선 설정 계산 및 스타일 적용
 function getActiveBubbleSettings() {
@@ -360,6 +375,11 @@ function renderState(state, force = false, detail = null) {
   const charDef = config?.characters[currentKey];
   if (!charDef) return;
 
+  // 효과음: 실제로 상태가 바뀔 때만 (클릭 반응은 매번), 기본 OFF
+  if (state !== prevState || state === "click_react") {
+    window.ScreenMateSfx?.forState(state);
+  }
+
   if (prevState === "sleeping" && state !== "sleeping") {
     // 수면 모드에서 벗어날 때 열려있던 상시 말풍선 닫기 처리
     if (bubbleTimer) {
@@ -521,6 +541,9 @@ async function setScale(scale, notify = true) {
 
   updateBubblePosition();
 
+  if (scaleSlider) scaleSlider.value = String(Math.round(currentScale * 100));
+  if (scaleValueEl) scaleValueEl.textContent = `${Math.round(currentScale * 100)}%`;
+
   scaleBtns.forEach((btn) => {
     const val = parseFloat(btn.dataset.scale);
     if (Math.abs(val - currentScale) < 0.05) {
@@ -546,6 +569,41 @@ async function toggleAlwaysOnTop() {
   } catch (e) {
     console.error("set_always_on_top failed:", e);
   }
+  syncTray();
+}
+
+function togglePositionLock() {
+  isPositionLocked = !isPositionLocked;
+  localStorage.setItem("screenmate_position_locked", isPositionLocked.toString());
+  updateLockUI();
+  showSubtitle(isPositionLocked ? "🔒 위치 잠금: 드래그로 옮겨지지 않아요" : "🔓 위치 잠금 해제", 2000);
+  syncTray();
+}
+
+function updateLockUI() {
+  if (!lockStatusText) return;
+  lockStatusText.textContent = isPositionLocked ? "위치 잠금: ON" : "위치 잠금: OFF";
+  lockIconEl.textContent = isPositionLocked ? "🔒" : "🔓";
+  toggleLockBtn.style.opacity = isPositionLocked ? "1" : "0.7";
+}
+
+function updateSfxUI() {
+  const sfx = window.ScreenMateSfx;
+  if (!sfx || !sfxStatusText) return;
+  const on = sfx.isEnabled();
+  const vol = Math.round(sfx.getVolume() * 100);
+  sfxStatusText.textContent = on ? "효과음: ON" : "효과음: OFF";
+  sfxIconEl.textContent = on ? "🔊" : "🔇";
+  toggleSfxBtn.style.opacity = on ? "1" : "0.7";
+  sfxVolumeSlider.value = String(vol);
+  sfxVolumeSlider.disabled = !on;
+  sfxVolumeRow.classList.toggle("disabled", !on);
+  sfxVolumeValueEl.textContent = `${vol}%`;
+}
+
+/** 트레이 메뉴 체크 표시를 오버레이의 실제 상태와 맞춘다 */
+function syncTray() {
+  invoke("sync_tray_state", { alwaysOnTop: isAlwaysOnTop, positionLocked: isPositionLocked }).catch(() => {});
 }
 
 function updateAlwaysOnTopUI() {
@@ -798,6 +856,14 @@ document.addEventListener("mousemove", (event) => {
     if (dx > 6 || dy > 6) {
       isDragging = true;
       isMouseDown = false;
+      if (isPositionLocked) {
+        // 잠금 중에는 창을 옮기지 않고, 가끔만 안내 (말풍선 도배 방지)
+        if (Date.now() - lastLockHintTime > 4000) {
+          lastLockHintTime = Date.now();
+          showSubtitle("🔒 위치가 잠겨 있어요 (우클릭 메뉴에서 해제)", 2000);
+        }
+        return;
+      }
       appWindow.startDragging().catch((err) => {
         console.error("startDragging failed:", err);
       });
@@ -876,6 +942,44 @@ toggleTopBtn.addEventListener("click", (e) => {
   toggleAlwaysOnTop();
 });
 
+if (scaleSlider) {
+  scaleSlider.addEventListener("input", () => {
+    setScale(parseInt(scaleSlider.value, 10) / 100, false);
+  });
+  scaleSlider.addEventListener("change", () => {
+    showSubtitle(`크기: ${Math.round(currentScale * 100)}%`, 1500);
+  });
+}
+
+toggleLockBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  togglePositionLock();
+});
+
+toggleSfxBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const sfx = window.ScreenMateSfx;
+  if (!sfx) return;
+  sfx.setEnabled(!sfx.isEnabled());
+  updateSfxUI();
+  if (sfx.isEnabled()) sfx.play("complete", { force: true }); // 미리 듣기
+});
+
+sfxVolumeSlider?.addEventListener("input", () => {
+  window.ScreenMateSfx?.setVolume(parseInt(sfxVolumeSlider.value, 10) / 100);
+  updateSfxUI();
+});
+
+sfxVolumeSlider?.addEventListener("change", () => {
+  window.ScreenMateSfx?.play("click", { force: true });
+});
+
+menuHideBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  contextMenu.classList.add("hidden");
+  invoke("hide_to_tray").catch((err) => console.error("hide_to_tray failed:", err));
+});
+
 menuSwitchCharBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   contextMenu.classList.add("hidden");
@@ -904,6 +1008,11 @@ window.addEventListener("resize", () => {
     fitModelToCanvas();
     updateBubblePosition();
   }
+});
+
+listen("tray-action", (event) => {
+  if (event.payload === "toggle_always_on_top") toggleAlwaysOnTop();
+  else if (event.payload === "toggle_position_lock") togglePositionLock();
 });
 
 listen("state-change", (event) => {
@@ -958,10 +1067,15 @@ async function init() {
     await switchCharacter(activeKey);
     setScale(currentScale, false);
     updateAlwaysOnTopUI();
+    updateLockUI();
+    updateSfxUI();
     applyBubbleStyles();
   } catch (e) {
     console.error("Init failed:", e);
   }
+  // 저장된 '항상 위' 설정을 실제 창에 반영 (기존에는 UI만 OFF로 보이고 창은 계속 위에 있었음)
+  invoke("set_always_on_top", { alwaysOnTop: isAlwaysOnTop }).catch(() => {});
+  syncTray();
 }
 
 init();

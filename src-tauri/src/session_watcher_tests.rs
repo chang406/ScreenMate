@@ -19,7 +19,12 @@ fn scratch_dir(tag: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let dir = std::env::temp_dir().join(format!("screenmate_test_{}_{}_{}", tag, std::process::id(), nanos));
+    let dir = std::env::temp_dir().join(format!(
+        "screenmate_test_{}_{}_{}",
+        tag,
+        std::process::id(),
+        nanos
+    ));
     fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -57,7 +62,10 @@ fn busy(detail: &str) -> (AgentState, Option<String>) {
 
 #[test]
 fn antigravity_fixture_sequence() {
-    let got = replay(AGY_PATH, &fixtures_dir().join("antigravity/sample_session.jsonl"));
+    let got = replay(
+        AGY_PATH,
+        &fixtures_dir().join("antigravity/sample_session.jsonl"),
+    );
     assert_eq!(
         got,
         vec![
@@ -71,7 +79,10 @@ fn antigravity_fixture_sequence() {
 
 #[test]
 fn claude_fixture_sequence() {
-    let got = replay(CLAUDE_PATH, &fixtures_dir().join("claude/sample_session.jsonl"));
+    let got = replay(
+        CLAUDE_PATH,
+        &fixtures_dir().join("claude/sample_session.jsonl"),
+    );
     assert_eq!(
         got,
         vec![
@@ -85,7 +96,10 @@ fn claude_fixture_sequence() {
 
 #[test]
 fn codex_legacy_fixture_sequence() {
-    let got = replay(CODEX_PATH, &fixtures_dir().join("chatgpt_codex/sample_session.jsonl"));
+    let got = replay(
+        CODEX_PATH,
+        &fixtures_dir().join("chatgpt_codex/sample_session.jsonl"),
+    );
     assert_eq!(
         got,
         vec![
@@ -120,7 +134,10 @@ fn claude_plain_user_prompt_is_thinking() {
         "type": "user",
         "message": { "role": "user", "content": "버그 고쳐줘" }
     });
-    assert_eq!(classify_as(CLAUDE_PATH, rec), Some((AgentState::Thinking, None)));
+    assert_eq!(
+        classify_as(CLAUDE_PATH, rec),
+        Some((AgentState::Thinking, None))
+    );
 }
 
 #[test]
@@ -132,7 +149,10 @@ fn claude_api_error_message_is_error() {
             { "type": "text", "text": "API Error: 529 Overloaded" }
         ]}
     });
-    assert_eq!(classify_as(CLAUDE_PATH, rec), Some((AgentState::Error, None)));
+    assert_eq!(
+        classify_as(CLAUDE_PATH, rec),
+        Some((AgentState::Error, None))
+    );
 }
 
 #[test]
@@ -142,13 +162,21 @@ fn claude_meta_records_are_ignored() {
         json!({ "type": "user", "isMeta": true, "message": { "role": "user", "content": "<command-name>/clear</command-name>" } }),
         json!({ "type": "file-history-snapshot", "snapshot": {} }),
     ] {
-        assert_eq!(classify_as(CLAUDE_PATH, rec.clone()), None, "record should be ignored: {}", rec);
+        assert_eq!(
+            classify_as(CLAUDE_PATH, rec.clone()),
+            None,
+            "record should be ignored: {}",
+            rec
+        );
     }
 }
 
 #[test]
 fn claude_realistic_fixture_sequence() {
-    let got = replay(CLAUDE_PATH, &fixtures_dir().join("claude/realistic_session.jsonl"));
+    let got = replay(
+        CLAUDE_PATH,
+        &fixtures_dir().join("claude/realistic_session.jsonl"),
+    );
     assert_eq!(
         got,
         vec![
@@ -195,17 +223,31 @@ fn codex_rollout_records() {
             json!({ "type": "event_msg", "payload": { "type": "agent_message", "message": "완료했습니다" } }),
             Some((AgentState::Talking, None)),
         ),
-        (json!({ "type": "session_meta", "payload": { "id": "x", "cwd": "/tmp" } }), None),
-        (json!({ "type": "event_msg", "payload": { "type": "token_count", "info": null } }), None),
+        (
+            json!({ "type": "session_meta", "payload": { "id": "x", "cwd": "/tmp" } }),
+            None,
+        ),
+        (
+            json!({ "type": "event_msg", "payload": { "type": "token_count", "info": null } }),
+            None,
+        ),
     ];
     for (rec, expected) in cases {
-        assert_eq!(classify_as(CODEX_PATH, rec.clone()), expected, "record: {}", rec);
+        assert_eq!(
+            classify_as(CODEX_PATH, rec.clone()),
+            expected,
+            "record: {}",
+            rec
+        );
     }
 }
 
 #[test]
 fn codex_rollout_fixture_sequence() {
-    let got = replay(CODEX_PATH, &fixtures_dir().join("chatgpt_codex/rollout_session.jsonl"));
+    let got = replay(
+        CODEX_PATH,
+        &fixtures_dir().join("chatgpt_codex/rollout_session.jsonl"),
+    );
     assert_eq!(
         got,
         vec![
@@ -225,7 +267,11 @@ fn codex_rollout_fixture_sequence() {
 // ---------------------------------------------------------------------------
 
 fn append(path: &Path, bytes: &[u8]) {
-    let mut f = fs::OpenOptions::new().create(true).append(true).open(path).unwrap();
+    let mut f = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .unwrap();
     f.write_all(bytes).unwrap();
     f.flush().unwrap();
 }
@@ -243,7 +289,10 @@ fn tail_reads_appended_complete_lines() {
     let file = dir.join("s.jsonl");
     append(&file, b"{\"old\":1}\n");
     let mut tail = tail_from_end(&file);
-    assert!(tail.read_new_records().is_empty(), "pre-existing content must be skipped");
+    assert!(
+        tail.read_new_records().is_empty(),
+        "pre-existing content must be skipped"
+    );
 
     append(&file, b"{\"a\":1}\n{\"b\":2}\n");
     let recs = tail.read_new_records();
@@ -263,7 +312,10 @@ fn tail_does_not_drop_partially_written_line() {
 
     // The rest arrives on the next poll — the record must not be lost.
     append(&file, b"age\":\"hi\"}\n");
-    assert_eq!(tail.read_new_records(), vec![json!({"type":"user","message":"hi"})]);
+    assert_eq!(
+        tail.read_new_records(),
+        vec![json!({"type":"user","message":"hi"})]
+    );
 }
 
 #[test]
@@ -298,7 +350,10 @@ fn tail_reads_new_small_session_from_first_line() {
     // A brand-new conversation file appears after the app started: its first prompt must not be skipped.
     let dir = scratch_dir("tail_new_session");
     let file = dir.join("new.jsonl");
-    append(&file, b"{\"type\":\"user\",\"message\":{\"content\":\"hi\"}}\n");
+    append(
+        &file,
+        b"{\"type\":\"user\",\"message\":{\"content\":\"hi\"}}\n",
+    );
     let mut tail = Tail::new();
     tail.switch_to(file.clone(), StartAt::Resume);
     assert_eq!(tail.read_new_records().len(), 1);
@@ -348,10 +403,18 @@ fn claude_project_folder_mentioning_other_tool_is_still_claude() {
         "/home/u/.claude/projects/-home-u-gemini-app/s.jsonl",
         "/home/u/.claude/projects/-home-u-codex-tools/s.jsonl",
     ] {
-        assert_eq!(registry.match_adapter_for_path(Path::new(p)).map(|a| a.id()), Some("claude"), "{p}");
+        assert_eq!(
+            registry
+                .match_adapter_for_path(Path::new(p))
+                .map(|a| a.id()),
+            Some("claude"),
+            "{p}"
+        );
     }
     assert_eq!(
-        registry.match_adapter_for_path(Path::new("D:/logs/claude_backup/s.jsonl")).map(|a| a.id()),
+        registry
+            .match_adapter_for_path(Path::new("D:/logs/claude_backup/s.jsonl"))
+            .map(|a| a.id()),
         Some("claude")
     );
 }
@@ -362,7 +425,10 @@ fn claude_interrupt_returns_to_idle() {
         "type": "user",
         "message": { "role": "user", "content": [{ "type": "text", "text": "[Request interrupted by user]" }] }
     });
-    assert_eq!(classify_as(CLAUDE_PATH, rec), Some((AgentState::Idle, None)));
+    assert_eq!(
+        classify_as(CLAUDE_PATH, rec),
+        Some((AgentState::Idle, None))
+    );
 }
 
 #[test]
@@ -383,8 +449,18 @@ fn scan_counts_sessions_and_finds_latest() {
     std::thread::sleep(Duration::from_millis(20));
     fs::write(proj.join("new.jsonl"), b"{}\n").unwrap();
     let mut roots = vec![
-        WatchedPathInfo { path: dir.to_string_lossy().to_string(), source: "custom".into(), exists: true, session_count: 0 },
-        WatchedPathInfo { path: dir.join("missing").to_string_lossy().to_string(), source: "custom".into(), exists: false, session_count: 0 },
+        WatchedPathInfo {
+            path: dir.to_string_lossy().to_string(),
+            source: "custom".into(),
+            exists: true,
+            session_count: 0,
+        },
+        WatchedPathInfo {
+            path: dir.join("missing").to_string_lossy().to_string(),
+            source: "custom".into(),
+            exists: false,
+            session_count: 0,
+        },
     ];
     let latest = scan_watch_roots(&mut roots);
     assert_eq!(latest.as_deref(), Some(proj.join("new.jsonl").as_path()));
