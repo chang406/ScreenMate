@@ -869,7 +869,11 @@ fn sanitize_live2d_filenames(custom_char_dir: &Path, id: &str, model_filename: &
         for entry in entries.flatten() {
             let path = entry.path();
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with(prefix) && (name.len() == prefix.len() || name.chars().nth(prefix.len()) == Some('.')) {
+                // `prefix.len()` is a byte offset, so compare bytes (not `chars().nth`, which counts
+                // characters and never matched for non-ASCII prefixes such as "火火").
+                if name.starts_with(prefix)
+                    && (name.len() == prefix.len() || name.as_bytes().get(prefix.len()) == Some(&b'.'))
+                {
                     let suffix = &name[prefix.len()..];
                     let new_name = format!("{}{}", id, suffix);
                     let new_path = custom_char_dir.join(new_name);
@@ -1316,6 +1320,160 @@ mod tests {
         ] {
             assert!(validate_character_id(id).is_err(), "{id:?} must be rejected");
         }
+    }
+
+    // --- Characterization tests: pin current behaviour before splitting this file ---------
+
+    fn scratch(tag: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!("screenmate_lib_{tag}_{}_{nanos}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn write(path: &Path, content: &str) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, content).unwrap();
+    }
+
+    /// A small Live2D folder: two registered motion groups, one registered expression, plus a
+    /// loose motion and a loose expression file that are not listed in model3.json.
+    fn sample_live2d_folder() -> PathBuf {
+        let dir = scratch("l2d");
+        let model = dir.join("hiyori");
+        write(
+            &model.join("hiyori.model3.json"),
+            &json!({
+                "Version": 3,
+                "FileReferences": {
+                    "Moc": "hiyori.moc3",
+                    "Textures": ["hiyori.2048/texture_00.png"],
+                    "Motions": {
+                        "Idle": [{ "File": "motions/idle_01.motion3.json" }],
+                        "TapBody": [{ "File": "motions/tap_01.motion3.json" }]
+                    },
+                    "Expressions": [{ "Name": "smile", "File": "exp/smile.exp3.json" }]
+                }
+            })
+            .to_string(),
+        );
+        for f in [
+            "motions/idle_01.motion3.json",
+            "motions/tap_01.motion3.json",
+            "motions/think_01.motion3.json",
+            "exp/smile.exp3.json",
+            "exp/angry.exp3.json",
+        ] {
+            write(&model.join(f), "{}");
+        }
+        // 4K check reads the PNG header: write a 2048x2048 header.
+        let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        png.extend_from_slice(&2048u32.to_be_bytes());
+        png.extend_from_slice(&2048u32.to_be_bytes());
+        fs::create_dir_all(model.join("hiyori.2048")).unwrap();
+        fs::write(model.join("hiyori.2048/texture_00.png"), &png).unwrap();
+        dir
+    }
+
+    #[test]
+    fn parse_live2d_folder_collects_motions_expressions_and_suggestions() {
+        let dir = sample_live2d_folder();
+        let r = parse_live2d_folder(dir.to_string_lossy().to_string()).unwrap();
+        assert_eq!(r.model_filename, "hiyori.model3.json");
+        assert!(r.model_folder.ends_with("hiyori"));
+        assert!(!r.is_4k);
+
+        let mut groups = r.motion_groups.clone();
+        groups.sort();
+        assert_eq!(groups, vec!["Idle", "TapBody", "think_01"]);
+        let mut exps = r.expressions.clone();
+        exps.sort();
+        assert_eq!(exps, vec!["angry", "smile"]);
+
+        assert_eq!(r.suggested_mapping["idle"], "Idle");
+        assert_eq!(r.suggested_mapping["thinking"], "think_01");
+        assert_eq!(r.suggested_mapping["click_react"], "TapBody");
+        assert_eq!(r.suggested_mapping["sleeping"], "Idle"); // falls back to idle
+        assert_eq!(r.suggested_expressions["talking"], "smile");
+        assert_eq!(r.suggested_expressions["error"], "angry");
+        assert_eq!(r.suggested_expressions["idle"], "");
+        assert_eq!(r.suggested_mapping.len(), 7);
+        assert_eq!(r.suggested_expressions.len(), 7);
+    }
+
+    #[test]
+    fn parse_live2d_folder_reports_missing_model() {
+        let dir = scratch("l2d_empty");
+        assert!(parse_live2d_folder(dir.to_string_lossy().to_string()).is_err());
+        assert!(parse_live2d_folder("/definitely/not/here".into()).is_err());
+    }
+
+    #[test]
+    fn png_4k_detection_reads_header() {
+        let dir = scratch("png");
+        let mk = |w: u32, h: u32| {
+            let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+            png.extend_from_slice(&w.to_be_bytes());
+            png.extend_from_slice(&h.to_be_bytes());
+            png
+        };
+        fs::write(dir.join("a.png"), mk(4096, 4096)).unwrap();
+        fs::write(dir.join("b.png"), mk(2048, 3840)).unwrap();
+        fs::write(dir.join("c.png"), mk(2048, 2048)).unwrap();
+        fs::write(dir.join("d.png"), b"not a png").unwrap();
+        assert!(is_png_4k(&dir.join("a.png")));
+        assert!(is_png_4k(&dir.join("b.png")));
+        assert!(!is_png_4k(&dir.join("c.png")));
+        assert!(!is_png_4k(&dir.join("d.png")));
+        assert!(!is_png_4k(&dir.join("missing.png")));
+    }
+
+    #[test]
+    fn keyword_thesaurus_prefers_earlier_groups_then_fallback() {
+        let c: Vec<String> = ["Main_Loop", "待機", "Tap"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(match_keyword_thesaurus(&c, &[&["loop"], &["待機"]], ""), "Main_Loop");
+        assert_eq!(match_keyword_thesaurus(&c, &[&["nothing"]], "Tap"), "Tap");
+        assert_eq!(match_keyword_thesaurus(&c, &[&["nothing"]], "Absent"), "");
+    }
+
+    #[test]
+    fn sanitize_renames_non_ascii_model_files_to_id() {
+        let dir = scratch("sanitize");
+        write(
+            &dir.join("火火.model3.json"),
+            &json!({ "FileReferences": {
+                "Moc": "火火.moc3", "Physics": "火火.physics3.json",
+                "Textures": ["火火.4096/texture_00.png"] } })
+            .to_string(),
+        );
+        write(&dir.join("火火.moc3"), "moc");
+        write(&dir.join("火火.physics3.json"), "{}");
+        write(&dir.join("火火.4096/texture_00.png"), "png");
+        let new_name = sanitize_live2d_filenames(&dir, "huohuo", "火火.model3.json").unwrap();
+        assert_eq!(new_name, "huohuo.model3.json");
+        assert!(dir.join("huohuo.moc3").exists());
+        assert!(dir.join("huohuo.4096/texture_00.png").exists());
+        assert!(!dir.join("火火.model3.json").exists());
+        let v: Value = serde_json::from_str(&fs::read_to_string(dir.join("huohuo.model3.json")).unwrap()).unwrap();
+        assert_eq!(v["FileReferences"]["Moc"], "huohuo.moc3");
+        assert_eq!(v["FileReferences"]["Textures"][0], "huohuo.4096/texture_00.png");
+        // Already-clean names are left alone.
+        assert_eq!(sanitize_live2d_filenames(&dir, "huohuo", "huohuo.model3.json").unwrap(), "huohuo.model3.json");
+    }
+
+    #[test]
+    fn load_app_config_creates_defaults_when_missing() {
+        let dir = scratch("config");
+        let cfg = load_app_config(&dir);
+        assert_eq!(cfg["activeCharacter"], "mao");
+        assert_eq!(cfg["customWatchPaths"], json!([]));
+        assert_eq!(cfg["globalBubbleSettings"]["bgColor"], "#0f0f14");
+        assert!(dir.join("app_config.json").exists(), "default file is written");
+        save_app_config(&dir, &json!({ "activeCharacter": "wanko" })).unwrap();
+        assert_eq!(load_app_config(&dir)["activeCharacter"], "wanko");
     }
 
     #[test]
