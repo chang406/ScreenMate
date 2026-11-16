@@ -1,22 +1,25 @@
-//! Desktop-resident integration: system tray menu and main-window position persistence.
+//! Desktop-resident integration: system tray menu and main-window placement.
 //!
-//! - Tray: show/hide character, open character manager, always-on-top / position-lock toggles, quit.
-//!   Toggles that the overlay owns (always-on-top, position lock) are forwarded to the main window as
-//!   `tray-action` events so the overlay stays the single source of truth; it reports back via
-//!   `sync_tray_state` so the check marks always match.
-//! - Position: the main window's position is saved (debounced) into `app_config.json` as
-//!   `windowPosition` and restored at startup only if it is still on a connected monitor.
-//!   Size/position are then fitted to that monitor by [`crate::window_fit`] (startup, after every
-//!   drag settles, after a DPI change), and the tray offers a "reset position/size" escape hatch.
+//! - Tray: show/hide character, open character manager, always-on-top / position-lock toggles,
+//!   "bring to screen centre", quit. Toggles that the overlay owns (always-on-top, position lock)
+//!   are forwarded to the main window as `tray-action` events so the overlay stays the single
+//!   source of truth; it reports back via `sync_tray_state` so the check marks always match.
+//! - Placement: the app always starts at the centre of the primary monitor (user decision; the
+//!   previous "remember last position" behaviour was removed). After the user drags the
+//!   character, its position is never changed - only the window size is re-fitted by
+//!   [`crate::window_fit`] when it lands on a monitor of a different size / scale.
 
-use serde_json::{json, Value};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Runtime, WebviewWindow, Wry};
+use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow, Wry};
 
-const POSITION_SAVE_DEBOUNCE: Duration = Duration::from_millis(800);
+/// How long the window must stay still before a move counts as "settled".
+const MOVE_SETTLE: Duration = Duration::from_millis(800);
+/// The first character-size report after start re-centres once (the character's real size is
+/// only known after it has been rendered), unless it arrives later than this.
+const STARTUP_RECENTER_WINDOW: Duration = Duration::from_secs(8);
 
 /// Menu handles kept so their label / check state can be updated later.
 pub struct TrayHandles {
@@ -25,8 +28,10 @@ pub struct TrayHandles {
     position_lock: CheckMenuItem<Wry>,
 }
 
-/// Latest unsaved main-window position (physical px) and when it was observed.
-static PENDING_POSITION: Mutex<Option<(i32, i32, Instant)>> = Mutex::new(None);
+/// When the main window last moved (cleared once handled).
+static PENDING_MOVE: Mutex<Option<Instant>> = Mutex::new(None);
+/// App start time while the one-time "re-centre with the real character size" is still pending.
+static STARTUP_RECENTER: Mutex<Option<Instant>> = Mutex::new(None);
 
 // ---------------------------------------------------------------------------
 // Tray
@@ -163,165 +168,54 @@ pub fn sync_tray_state(app: AppHandle, always_on_top: bool, position_locked: boo
 }
 
 // ---------------------------------------------------------------------------
-// Window position persistence
+// Placement
 // ---------------------------------------------------------------------------
 
-/// A monitor work area in physical pixels: (x, y, width, height).
-pub type MonitorRect = (i32, i32, u32, u32);
-
-/// True if the character area of a window at `pos` with `size` would be on one of `monitors`.
-///
-/// The overlay is a large transparent window whose character sits at the bottom centre, so we test
-/// that anchor point (not the window's top-left corner, which may legitimately be off-screen).
-pub fn is_position_visible(pos: (i32, i32), size: (u32, u32), monitors: &[MonitorRect]) -> bool {
-    let anchor_x = pos.0 as i64 + size.0 as i64 / 2;
-    let anchor_y = pos.1 as i64 + (size.1 as i64 * 4) / 5;
-    monitors.iter().any(|&(mx, my, mw, mh)| {
-        let (mx, my) = (mx as i64, my as i64);
-        anchor_x >= mx && anchor_x < mx + mw as i64 && anchor_y >= my && anchor_y < my + mh as i64
-    })
-}
-
-/// Parses `windowPosition` from the app config.
-pub fn saved_position(config: &Value) -> Option<(i32, i32)> {
-    let pos = config.get("windowPosition")?;
-    let x = pos.get("x")?.as_i64()?;
-    let y = pos.get("y")?.as_i64()?;
-    Some((i32::try_from(x).ok()?, i32::try_from(y).ok()?))
-}
-
-/// Moves the main window to its saved position if that position is still on a connected monitor.
-pub fn restore_main_position(win: &WebviewWindow, config: &Value) {
-    let Some((x, y)) = saved_position(config) else {
-        return;
-    };
-    let size = win
-        .outer_size()
-        .map(|s| (s.width, s.height))
-        .unwrap_or((640, 920));
-    let monitors: Vec<MonitorRect> = win
-        .available_monitors()
-        .unwrap_or_default()
-        .iter()
-        .map(|m| {
-            let p = m.position();
-            let s = m.size();
-            (p.x, p.y, s.width, s.height)
-        })
-        .collect();
-    if is_position_visible((x, y), size, &monitors) {
-        let _ = win.set_position(PhysicalPosition::new(x, y));
-    } else {
-        println!("[desktop] saved position ({x}, {y}) is off-screen; using default position");
-        crate::window_fit::place_default_main(win);
+/// Startup placement: always the centre of the primary monitor.
+pub fn place_main_at_startup(win: &WebviewWindow) {
+    crate::window_fit::recenter(win, true);
+    if let Ok(mut pending) = STARTUP_RECENTER.lock() {
+        *pending = Some(Instant::now());
     }
 }
 
-/// Startup placement: saved position (if still visible) or the default spot, then fitted to the
-/// monitor so the character is never off-screen on a smaller / higher-DPI display.
-pub fn place_main_at_startup(win: &WebviewWindow, config: &Value) {
-    if saved_position(config).is_some() {
-        restore_main_position(win, config);
-    } else {
-        crate::window_fit::place_default_main(win);
-    }
-    // Something must be grabbable after start (a saved spot may come from another monitor
-    // setup), but a deliberately half-hidden character is otherwise left where it was.
-    crate::window_fit::refit_main(win, crate::window_fit::FitMode::RescueOnly);
-}
-
-/// Records a main-window move; the actual write happens in [`run_position_saver`].
-pub fn note_main_moved(x: i32, y: i32) {
-    if let Ok(mut pending) = PENDING_POSITION.lock() {
-        *pending = Some((x, y, Instant::now()));
+/// Called when the overlay first reports the real character size: centre once more with it
+/// (the startup centring used an estimate). Later reports are ignored here.
+pub fn on_character_measured<R: Runtime>(win: &WebviewWindow<R>) {
+    let started = STARTUP_RECENTER.lock().ok().and_then(|mut p| p.take());
+    if started.is_some_and(|t| t.elapsed() < STARTUP_RECENTER_WINDOW) {
+        crate::window_fit::recenter(win, true);
     }
 }
 
-/// Writes any pending position immediately (used on quit).
-pub fn flush_position() {
-    let pending = PENDING_POSITION.lock().ok().and_then(|mut p| p.take());
-    if let Some((x, y, _)) = pending {
-        let result = crate::update_app_config(|cfg| {
-            if let Some(obj) = cfg.as_object_mut() {
-                obj.insert("windowPosition".into(), json!({ "x": x, "y": y }));
-            }
-        });
-        if let Err(e) = result {
-            eprintln!("[desktop] failed to save window position: {e}");
-        }
+/// Records a main-window move; handled by [`run_move_watcher`] once it settles.
+pub fn note_main_moved() {
+    if let Ok(mut pending) = PENDING_MOVE.lock() {
+        *pending = Some(Instant::now());
     }
 }
 
-/// Background task: persists the window position once dragging has settled.
-/// Background task: once a drag (or DPI / monitor change) has settled, fits the window to the
-/// monitor it landed on and persists the final position.
-pub async fn run_position_saver(app: AppHandle) {
+/// Background task: once a drag (or DPI / monitor change) has settled, fits the window *size* to
+/// the monitor it landed on. The position chosen by the user is never changed (peeking from the
+/// screen edge or hiding the character is intended use; "bring to centre" is the way back).
+pub async fn run_move_watcher(app: AppHandle) {
     loop {
         tokio::time::sleep(Duration::from_millis(400)).await;
-        let settled = PENDING_POSITION
+        let settled = PENDING_MOVE
             .lock()
             .ok()
-            .and_then(|p| p.map(|(_, _, at)| at.elapsed() >= POSITION_SAVE_DEBOUNCE))
+            .map(|mut p| match *p {
+                Some(at) if at.elapsed() >= MOVE_SETTLE => {
+                    *p = None;
+                    true
+                }
+                _ => false,
+            })
             .unwrap_or(false);
         if settled {
             if let Some(win) = app.get_webview_window("main") {
-                // May move/resize the window; that emits `Moved` again and the corrected
-                // position is saved on the next settle (the second refit is a no-op).
-                // The user chose this spot (peeking / hidden on purpose): never move it, only fit
-                // the window size if it landed on a different monitor.
                 crate::window_fit::refit_main(&win, crate::window_fit::FitMode::SizeOnly);
             }
-            flush_position();
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const WIN: (u32, u32) = (640, 920);
-
-    #[test]
-    fn position_on_primary_monitor_is_visible() {
-        let monitors = [(0, 0, 1920, 1080)];
-        assert!(is_position_visible((1200, 150), WIN, &monitors));
-    }
-
-    #[test]
-    fn position_on_disconnected_second_monitor_is_rejected() {
-        // Saved while a monitor was attached to the right; now only the primary remains.
-        let monitors = [(0, 0, 1920, 1080)];
-        assert!(!is_position_visible((2500, 100), WIN, &monitors));
-        // ...but accepted again once the second monitor is back.
-        let both = [(0, 0, 1920, 1080), (1920, 0, 2560, 1440)];
-        assert!(is_position_visible((2500, 100), WIN, &both));
-    }
-
-    #[test]
-    fn window_top_may_be_above_screen_if_character_is_visible() {
-        // A tall transparent window dragged up so its empty top part is off-screen.
-        let monitors = [(0, 0, 1920, 1080)];
-        assert!(is_position_visible((600, -500), WIN, &monitors));
-        assert!(!is_position_visible((600, -900), WIN, &monitors));
-    }
-
-    #[test]
-    fn monitor_left_of_primary_has_negative_coordinates() {
-        let monitors = [(-1920, 0, 1920, 1080), (0, 0, 1920, 1080)];
-        assert!(is_position_visible((-1500, 100), WIN, &monitors));
-    }
-
-    #[test]
-    fn saved_position_parsing() {
-        assert_eq!(
-            saved_position(&json!({ "windowPosition": { "x": -10, "y": 20 } })),
-            Some((-10, 20))
-        );
-        assert_eq!(
-            saved_position(&json!({ "windowPosition": { "x": "a" } })),
-            None
-        );
-        assert_eq!(saved_position(&json!({})), None);
     }
 }
