@@ -1177,7 +1177,8 @@ pub fn run() {
             remove_custom_watch_path,
             replay_fixture_session,
             desktop::hide_to_tray,
-            desktop::sync_tray_state
+            desktop::sync_tray_state,
+            window_fit::report_character_zone
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } if window.label() == "settings" => {

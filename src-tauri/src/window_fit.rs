@@ -14,12 +14,74 @@
 //!
 //! The placement maths is pure (`plan_placement`) and unit-tested; `refit_main` is the Tauri glue.
 
+use std::sync::Mutex;
 use tauri::{PhysicalPosition, PhysicalSize, Runtime, WebviewWindow};
 
 /// Design size of the overlay in logical pixels (see `tauri.conf.json`).
 pub const DESIGN_LOGICAL_SIZE: (f64, f64) = (640.0, 920.0);
 /// Gap kept between the window and the work-area edge for the default placement (logical px).
 const DEFAULT_MARGIN_LOGICAL: f64 = 8.0;
+
+/// Vertical span of the visible character inside the window, as fractions of the window height
+/// (0 = window top, 1 = window bottom). Reported by the overlay (`report_character_zone`) because
+/// it depends on the character model and its zoom level.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CharacterZone {
+    pub top: f64,
+    pub bottom: f64,
+}
+
+impl Default for CharacterZone {
+    /// Conservative guess used until the overlay reports the real span: the character occupies
+    /// roughly the lower half of the window at 100% zoom.
+    fn default() -> Self {
+        Self {
+            top: 0.45,
+            bottom: 0.98,
+        }
+    }
+}
+
+static CHARACTER_ZONE: Mutex<Option<CharacterZone>> = Mutex::new(None);
+
+fn current_zone() -> CharacterZone {
+    CHARACTER_ZONE
+        .lock()
+        .ok()
+        .and_then(|z| *z)
+        .unwrap_or_default()
+}
+
+/// Called by the overlay whenever the character's on-screen span changes (character switch,
+/// zoom, window resize). Schedules a refit so a character zoomed past the screen edge is pulled
+/// back once things settle.
+#[tauri::command]
+pub fn report_character_zone(window: tauri::Window, top: f64, bottom: f64) {
+    if !(top.is_finite() && bottom.is_finite()) {
+        return;
+    }
+    let top = top.clamp(0.0, 1.0);
+    let bottom = bottom.clamp(0.0, 1.0);
+    if bottom - top < 0.02 {
+        return;
+    }
+    let zone = CharacterZone { top, bottom };
+    let changed = CHARACTER_ZONE
+        .lock()
+        .map(|mut z| {
+            let changed = z.is_none_or(|old| {
+                (old.top - top).abs() > 0.01 || (old.bottom - bottom).abs() > 0.01
+            });
+            *z = Some(zone);
+            changed
+        })
+        .unwrap_or(false);
+    if changed && window.label() == "main" {
+        if let Ok(pos) = window.outer_position() {
+            crate::desktop::note_main_moved(pos.x, pos.y);
+        }
+    }
+}
 
 /// A rectangle in physical pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,12 +168,21 @@ pub fn default_placement(screen: &Screen) -> Placement {
 ///
 /// - Size: shrunk to the work area if needed. When shrinking, the bottom edge stays put
 ///   (the character stands at the bottom) and the window stays horizontally centred.
-/// - Vertical: the whole window is kept inside the work area, so the character's feet are never
-///   hidden below the screen or behind the taskbar.
+/// - Vertical: the *character* (not the whole window) is kept inside the work area: its feet never
+///   go below the screen / behind the taskbar and its head never above the screen top. The
+///   transparent space above the character may hang above the screen, so the character can be
+///   placed anywhere vertically, including near the top of the screen.
 /// - Horizontal: up to a quarter of the window may hang off either side. The left/right parts
 ///   of the window are transparent padding, so this still lets the character sit close to the
 ///   screen edge, while its body stays on-screen.
-pub fn plan_placement(screen: &Screen, x: i32, y: i32, w: u32, h: u32) -> Placement {
+pub fn plan_placement(
+    screen: &Screen,
+    x: i32,
+    y: i32,
+    w: u32,
+    h: u32,
+    zone: CharacterZone,
+) -> Placement {
     let (fw, fh) = fitted_size(screen);
     // Keep bottom-centre fixed while resizing.
     let mut nx = x as i64 + (w as i64 - fw as i64) / 2;
@@ -123,9 +194,17 @@ pub fn plan_placement(screen: &Screen, x: i32, y: i32, w: u32, h: u32) -> Placem
     let max_x = work.right() - fw as i64 + slack;
     nx = nx.clamp(min_x, max_x.max(min_x));
 
-    let min_y = work.y as i64;
-    let max_y = work.bottom() - fh as i64;
-    ny = ny.clamp(min_y, max_y.max(min_y));
+    let char_top = (zone.top * fh as f64).round() as i64;
+    let char_bottom = (zone.bottom * fh as f64).round() as i64;
+    // Head not above the screen top, feet not below the work-area bottom.
+    let min_y = work.y as i64 - char_top;
+    let max_y = work.bottom() - char_bottom;
+    // If the character is taller than the screen (should not happen once fitted), keep the feet.
+    ny = if max_y < min_y {
+        max_y
+    } else {
+        ny.clamp(min_y, max_y)
+    };
 
     Placement {
         x: nx as i32,
@@ -206,7 +285,7 @@ pub fn refit_main<R: Runtime>(win: &WebviewWindow<R>) {
     apply(
         win,
         cur,
-        plan_placement(&screen, cur.x, cur.y, cur.w, cur.h),
+        plan_placement(&screen, cur.x, cur.y, cur.w, cur.h, current_zone()),
     );
 }
 
@@ -234,6 +313,20 @@ pub fn place_default_main<R: Runtime>(win: &WebviewWindow<R>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Character occupying the lower half of the window (typical at 100% zoom).
+    const Z: CharacterZone = CharacterZone {
+        top: 0.5,
+        bottom: 0.98,
+    };
+
+    /// Screen y of the character's head / feet for a placement.
+    fn head_y(p: &Placement, z: CharacterZone) -> i64 {
+        p.y as i64 + (z.top * p.h as f64).round() as i64
+    }
+    fn feet_y(p: &Placement, z: CharacterZone) -> i64 {
+        p.y as i64 + (z.bottom * p.h as f64).round() as i64
+    }
 
     fn screen(x: i32, y: i32, w: u32, h: u32, taskbar: u32, scale: f64, primary: bool) -> Screen {
         Screen {
@@ -278,23 +371,49 @@ mod tests {
     }
 
     #[test]
-    fn oversized_window_on_laptop_is_pulled_fully_on_screen_vertically() {
+    fn oversized_window_on_laptop_brings_character_on_screen() {
         // The reported bug: window at the OS default spot, its bottom (and the character) far
         // below the 768px screen.
         let s = laptop_125();
-        let p = plan_placement(&s, 100, 50, 800, 1150);
+        let p = plan_placement(&s, 100, 50, 800, 1150, Z);
         assert_eq!((p.w, p.h), (800, 708));
-        assert!(p.y >= s.work.y);
-        assert!(
-            p.y as i64 + p.h as i64 <= s.work.bottom(),
-            "character feet must be visible: {p:?}"
-        );
+        assert!(head_y(&p, Z) >= s.work.y as i64, "head visible: {p:?}");
+        assert!(feet_y(&p, Z) <= s.work.bottom(), "feet visible: {p:?}");
+    }
+
+    #[test]
+    fn character_can_be_moved_up_to_the_top_of_the_screen() {
+        // Reported after the first version of this PR: the character could not be dragged higher
+        // because the *whole window* (whose top half is empty) had to stay on-screen.
+        // 2560x1440 @100%: dragging the window so the character's head touches the screen top
+        // puts the window's transparent top half above the screen - that must be allowed.
+        let s = screen(0, 0, 2560, 1440, 48, 1.0, true);
+        let wanted_y = -(0.5 * 920.0) as i32; // head exactly at y = 0
+        let p = plan_placement(&s, 1000, wanted_y, 640, 920, Z);
+        assert_eq!(p.y, wanted_y, "must not be pushed back down");
+        assert_eq!(head_y(&p, Z), 0);
+        // ...but the head itself may not go above the screen.
+        let p = plan_placement(&s, 1000, wanted_y - 200, 640, 920, Z);
+        assert_eq!(head_y(&p, Z), 0);
+    }
+
+    #[test]
+    fn bigger_zoom_limits_how_high_the_window_can_go() {
+        // At 200% zoom the character fills almost the whole window, so the window itself must
+        // stay (almost) fully on-screen - the limit follows the real character size.
+        let big = CharacterZone {
+            top: 0.05,
+            bottom: 0.98,
+        };
+        let s = desktop();
+        let p = plan_placement(&s, 900, -400, 640, 920, big);
+        assert_eq!(head_y(&p, big), 0);
     }
 
     #[test]
     fn already_fitting_window_is_not_moved() {
         let s = desktop();
-        let p = plan_placement(&s, 900, 100, 640, 920);
+        let p = plan_placement(&s, 900, 100, 640, 920, Z);
         assert_eq!(
             p,
             Placement {
@@ -307,31 +426,34 @@ mod tests {
     }
 
     #[test]
-    fn window_dragged_below_taskbar_is_pulled_up() {
+    fn character_dragged_below_taskbar_is_pulled_up() {
         let s = desktop();
-        let p = plan_placement(&s, 900, 400, 640, 920);
-        assert_eq!(p.y as i64 + p.h as i64, s.work.bottom());
+        let p = plan_placement(&s, 900, 400, 640, 920, Z);
+        assert_eq!(feet_y(&p, Z), s.work.bottom());
     }
 
     #[test]
     fn transparent_side_padding_may_hang_off_screen() {
         // A quarter of the width (160px) may be off-screen so the character can sit near the edge...
         let s = desktop();
-        assert_eq!(plan_placement(&s, -150, 100, 640, 920).x, -150);
+        assert_eq!(plan_placement(&s, -150, 100, 640, 920, Z).x, -150);
         assert_eq!(
-            plan_placement(&s, 1920 - 640 + 150, 100, 640, 920).x,
+            plan_placement(&s, 1920 - 640 + 150, 100, 640, 920, Z).x,
             1920 - 640 + 150
         );
         // ...but not more, or the character itself would leave the screen.
-        assert_eq!(plan_placement(&s, -500, 100, 640, 920).x, -160);
-        assert_eq!(plan_placement(&s, 1800, 100, 640, 920).x, 1920 - 640 + 160);
+        assert_eq!(plan_placement(&s, -500, 100, 640, 920, Z).x, -160);
+        assert_eq!(
+            plan_placement(&s, 1800, 100, 640, 920, Z).x,
+            1920 - 640 + 160
+        );
     }
 
     #[test]
     fn shrinking_keeps_bottom_centre_in_place() {
         // Window moved from a big monitor onto the laptop: same bottom edge & centre if possible.
         let s = screen(0, 0, 1366, 768, 60, 1.0, true); // 100%: wants 640x920, work height 708
-        let p = plan_placement(&s, 300, -212, 640, 920); // bottom at 708
+        let p = plan_placement(&s, 300, -212, 640, 920, Z); // bottom at 708
         assert_eq!((p.w, p.h), (640, 708));
         assert_eq!(p.y as i64 + p.h as i64, 708);
         assert_eq!(p.x, 300);
@@ -355,8 +477,9 @@ mod tests {
             scale: 1.0,
             primary: true,
         };
-        let p = plan_placement(&s, 500, 0, 640, 920);
-        assert_eq!(p.y, 40);
+        // Head would be under a 40px top taskbar if the window went higher.
+        let p = plan_placement(&s, 500, -600, 640, 920, Z);
+        assert_eq!(head_y(&p, Z), 40);
     }
 
     #[test]
@@ -374,7 +497,7 @@ mod tests {
         let picked = pick_screen(&[main], 3000, 200, 640, 920).unwrap();
         assert!(picked.primary);
         // And the resulting placement is on that screen.
-        let p = plan_placement(&picked, 3000, 200, 640, 920);
+        let p = plan_placement(&picked, 3000, 200, 640, 920, Z);
         assert!(p.x as i64 + p.w as i64 / 2 < main.work.right());
     }
 
@@ -392,8 +515,9 @@ mod tests {
     fn tiny_screen_never_produces_negative_or_inverted_ranges() {
         // Smaller than the window in both directions (e.g. a portrait 600x500 virtual display).
         let s = screen(0, 0, 600, 500, 40, 1.0, true);
-        let p = plan_placement(&s, -9999, 9999, 640, 920);
+        let p = plan_placement(&s, -9999, 9999, 640, 920, Z);
         assert_eq!((p.w, p.h), (600, 460));
-        assert_eq!(p.y, 0);
+        assert!(feet_y(&p, Z) <= s.work.bottom());
+        assert!(head_y(&p, Z) >= 0);
     }
 }
