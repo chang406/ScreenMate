@@ -18,6 +18,9 @@
         <img id="image-character" class="hidden" alt="2D Character" />
       </div>
 
+      <!-- 클릭 영역 보기: 마우스 위치에 "클릭됨(초록) / 통과(회색)" 표시 -->
+      <div id="hit-indicator" class="hidden" aria-hidden="true"></div>
+
       <!-- 캐릭터 변경 미니 힌트 -->
       <div id="char-hint">
         <span id="char-name">Mao (Live2D)</span>
@@ -52,6 +55,11 @@
         <button id="toggle-lock-btn" class="menu-item">
           <span class="menu-icon" id="lock-icon">🔓</span>
           <span id="lock-status-text">위치 잠금: OFF</span>
+        </button>
+
+        <button id="toggle-hitview-btn" class="menu-item">
+          <span class="menu-icon">🎯</span>
+          <span id="hitview-status-text">클릭 영역 보기: OFF</span>
         </button>
 
         <div class="menu-section">
@@ -93,6 +101,7 @@
     <script src="lib/live2d-loader.js"></script>
 
     <script src="sfx.js"></script>
+    <script src="hittest.js"></script>
     <script type="module" src="main.js"></script>
   </body>
 </html>

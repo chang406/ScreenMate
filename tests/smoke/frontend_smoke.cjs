@@ -270,6 +270,37 @@ async function checkInteractions(page, key) {
     });
   } else out.sfx = null;
 
+  // 5) 픽셀 단위 클릭 판정: 캐릭터 경계 상자 안을 격자로 찍어 "클릭됨" 비율과 모서리/바깥 결과 확인
+  out.hitTest = await page.evaluate(() => {
+    const dbg = window.__screenmateDebug;
+    if (!dbg || !dbg.characterBounds) return null;
+    document.getElementById("context-menu").classList.add("hidden");
+    const b = dbg.characterBounds();
+    const N = 15;
+    let hits = 0;
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const x = b.left + ((i + 0.5) / N) * (b.right - b.left);
+        const y = b.top + ((j + 0.5) / N) * (b.bottom - b.top);
+        if (dbg.isOverCharacter(x, y)) hits++;
+      }
+    }
+    // 가운데 가로줄에서 왼쪽부터 처음 "클릭됨"이 되는 지점
+    const midY = (b.top + b.bottom) / 2;
+    let firstHitX = null;
+    for (let x = Math.floor(b.left) - 20; x <= b.right; x++) {
+      if (dbg.isOverCharacter(x, midY)) { firstHitX = x; break; }
+    }
+    return {
+      bounds: { left: Math.round(b.left), top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) },
+      gridHits: hits,
+      gridTotal: N * N,
+      topLeftCornerHit: dbg.isOverCharacter(b.left + 2, b.top + 2),
+      farOutsideHit: dbg.isOverCharacter(4, 4),
+      midRowFirstHitX: firstHitX,
+    };
+  });
+
   out.invokedCommands = await page.evaluate(() => [...new Set(window.__smoke.invokes)]);
   return out;
 }

@@ -59,6 +59,7 @@ cargo build --release
   - 캔버스/이미지의 알파 채널(투명도)을 실시간 검사.
   - 마우스가 캐릭터 불투명 영역 위에 있으면 `invoke('set_click_through', { ignore: false })` (클릭/드래그 가능).
   - 마우스가 투명 영역이나 빈 공간에 있으면 `invoke('set_click_through', { ignore: true })` (마우스가 뒤의 작업 창으로 통과).
+- **픽셀 판정 (`src/hittest.js`)**: 2D 이미지는 이미지별 알파 마스크(캐시), Live2D는 마우스 주변 WebGL 픽셀을 `readPixels`로 읽어 판정합니다(여유 범위 6px). 이를 위해 Pixi는 `preserveDrawingBuffer: true`로 생성해야 합니다. 판정 불가 시 `null` → `isOverCharacter`가 기존 사각형 판정으로 폴백합니다. 캐릭터별 클릭 영역 설정을 추가하지 마십시오(모든 캐릭터에 자동 적용되는 구조 유지).
 - ⚠️ **주의**: 클릭 관통 로직을 무력화하거나 CSS `pointer-events: none`만으로 대체하지 마십시오 (OS 레벨 클릭 관통이 깨집니다).
 
 ### ② 세션 로그 감시 및 다중 에이전트 어댑터 아키텍처 (`session_watcher.rs`)
