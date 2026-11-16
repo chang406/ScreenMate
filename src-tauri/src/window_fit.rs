@@ -8,9 +8,13 @@
 //! This module:
 //! - shrinks the window to fit the monitor's work area (taskbar excluded); the frontend scales the
 //!   character from the window size, so the character shrinks with it;
-//! - pulls the window back so the character area is on-screen (at startup, after a drag settles,
-//!   and when the window lands on a monitor with a different scale);
-//! - provides a "reset" placement (bottom-right of the primary monitor) for the tray menu.
+//! - places the character fully on-screen at startup (a saved position from a bigger monitor
+//!   may not fit the laptop);
+//! - never moves the character after the *user* drags it (peeking from the screen edge or
+//!   flicking it away to hide is intended use) - only the window size is re-fitted when it lands
+//!   on a monitor of a different size / scale;
+//! - offers "bring to screen centre" (overlay context menu and tray) as the escape hatch when the
+//!   character has been moved out of reach.
 //!
 //! The placement maths is pure (`plan_placement`) and unit-tested; `refit_main` is the Tauri glue.
 
@@ -86,12 +90,14 @@ pub fn report_character_zone(window: tauri::Window, top: f64, bottom: f64) {
 /// How strictly the character must be kept on-screen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FitMode {
-    /// The whole character must be visible. Used when *the environment* decides the position:
-    /// app start, tray "reset".
+    /// The whole character must be visible. Used for "bring to centre".
     KeepVisible,
-    /// Respect where the user dragged the character; only intervene when it is almost lost
-    /// (less than [`RESCUE_MIN_VISIBLE`] of its height on-screen), so it can still be grabbed.
+    /// At least [`RESCUE_MIN_VISIBLE`] of the character must be visible. Used at app start so a
+    /// position saved on another monitor setup still leaves something to grab.
     RescueOnly,
+    /// Only fit the window size to the monitor; never move the character. Used after the user
+    /// drags the character (or a DPI change while dragging).
+    SizeOnly,
 }
 
 /// In [`FitMode::RescueOnly`], the share of the character's height that must stay on-screen.
@@ -178,6 +184,17 @@ pub fn default_placement(screen: &Screen) -> Placement {
     }
 }
 
+/// "Bring to centre": the character (not the window) centred in the work area, fully visible.
+pub fn center_placement(screen: &Screen, zone: CharacterZone) -> Placement {
+    let (w, h) = fitted_size(screen);
+    let work = screen.work;
+    let x = work.x as i64 + (work.w as i64 - w as i64) / 2;
+    let char_mid = ((zone.top + zone.bottom) / 2.0 * h as f64).round() as i64;
+    let y = work.y as i64 + work.h as i64 / 2 - char_mid;
+    // Run through the strict rule so a huge zoom still keeps head and feet on-screen.
+    plan_placement(screen, x as i32, y as i32, w, h, zone, FitMode::KeepVisible)
+}
+
 /// Computes a placement that fits `screen` while moving the window as little as possible.
 ///
 /// - Size: shrunk to the work area if needed. When shrinking, the bottom edge stays put
@@ -203,6 +220,15 @@ pub fn plan_placement(
     let mut nx = x as i64 + (w as i64 - fw as i64) / 2;
     let mut ny = y as i64 + h as i64 - fh as i64;
 
+    if mode == FitMode::SizeOnly {
+        return Placement {
+            x: nx as i32,
+            y: ny as i32,
+            w: fw,
+            h: fh,
+        };
+    }
+
     let work = screen.work;
     let slack = fw as i64 / 4;
     let min_x = work.x as i64 - slack;
@@ -222,6 +248,7 @@ pub fn plan_placement(
                 work.bottom() - visible - char_top,
             )
         }
+        FitMode::SizeOnly => unreachable!("handled above"),
     };
     // If the character is taller than the screen (should not happen once fitted), keep the feet.
     ny = if max_y < min_y {
@@ -313,25 +340,50 @@ pub fn refit_main<R: Runtime>(win: &WebviewWindow<R>, mode: FitMode) {
     );
 }
 
-/// Moves the main window to the default spot on the primary monitor (tray "reset").
-pub fn reset_main<R: Runtime>(win: &WebviewWindow<R>) {
-    let Some(cur) = current_placement(win) else {
-        return;
-    };
-    let screens = screens_of(win);
-    let screen = screens
+fn primary_screen(screens: &[Screen]) -> Option<Screen> {
+    screens
         .iter()
         .find(|s| s.primary)
         .or_else(|| screens.first())
-        .copied();
-    if let Some(screen) = screen {
+        .copied()
+}
+
+/// Places the main window for the first time when no usable saved position exists
+/// (bottom-right of the primary monitor).
+pub fn place_default_main<R: Runtime>(win: &WebviewWindow<R>) {
+    let Some(cur) = current_placement(win) else {
+        return;
+    };
+    if let Some(screen) = primary_screen(&screens_of(win)) {
         apply(win, cur, default_placement(&screen));
     }
 }
 
-/// Places the main window for the first time when no usable saved position exists.
-pub fn place_default_main<R: Runtime>(win: &WebviewWindow<R>) {
-    reset_main(win);
+/// Moves the character to the centre of a monitor.
+/// `on_primary`: the tray uses the primary monitor (the character may be on a monitor that is
+/// gone or out of reach); the overlay's own menu uses the monitor the character is on.
+pub fn recenter<R: Runtime>(win: &WebviewWindow<R>, on_primary: bool) {
+    let Some(cur) = current_placement(win) else {
+        return;
+    };
+    let screens = screens_of(win);
+    let screen = if on_primary {
+        primary_screen(&screens)
+    } else {
+        pick_screen(&screens, cur.x, cur.y, cur.w, cur.h)
+    };
+    if let Some(screen) = screen {
+        apply(win, cur, center_placement(&screen, current_zone()));
+    }
+}
+
+/// Overlay context menu: "bring to screen centre".
+#[tauri::command]
+pub fn recenter_main(app: tauri::AppHandle) {
+    use tauri::Manager;
+    if let Some(win) = app.get_webview_window("main") {
+        recenter(&win, false);
+    }
 }
 
 #[cfg(test)]
@@ -596,5 +648,52 @@ mod tests {
         let s = laptop_125();
         let p = plan_placement(&s, 100, 50, 800, 1150, Z, R);
         assert_eq!((p.w, p.h), (800, 708));
+    }
+
+    // --- SizeOnly (after a user drag) & bring-to-centre ----------------------------------
+
+    #[test]
+    fn user_drag_is_never_moved_even_when_only_the_face_peeks_out() {
+        // Reported use case: drag the character down so only the face/upper body shows above
+        // the taskbar, or flick it away to hide it. The app must not pull it back.
+        let s = desktop();
+        for y in [700, 900, -800] {
+            let p = plan_placement(&s, 900, y, 640, 920, Z, FitMode::SizeOnly);
+            assert_eq!((p.x, p.y), (900, y));
+        }
+        let p = plan_placement(&s, -600, 0, 640, 920, Z, FitMode::SizeOnly);
+        assert_eq!(p.x, -600);
+    }
+
+    #[test]
+    fn size_only_still_fits_window_to_a_smaller_monitor_keeping_bottom_centre() {
+        let s = laptop_125();
+        let p = plan_placement(&s, 100, 50, 800, 1150, Z, FitMode::SizeOnly);
+        assert_eq!((p.w, p.h), (800, 708));
+        assert_eq!(p.y as i64 + p.h as i64, 50 + 1150);
+    }
+
+    #[test]
+    fn bring_to_centre_puts_character_in_the_middle_of_the_work_area() {
+        for s in [desktop(), laptop_125(), laptop_150_hidpi()] {
+            let p = center_placement(&s, Z);
+            let char_mid = (head_y(&p, Z) + feet_y(&p, Z)) / 2;
+            let work_mid = s.work.y as i64 + s.work.h as i64 / 2;
+            assert!(
+                (char_mid - work_mid).abs() <= 2,
+                "{s:?}: {char_mid} vs {work_mid}"
+            );
+            let win_mid = p.x as i64 + p.w as i64 / 2;
+            let work_mid_x = s.work.x as i64 + s.work.w as i64 / 2;
+            assert!((win_mid - work_mid_x).abs() <= 1);
+            assert!(head_y(&p, Z) >= s.work.y as i64 && feet_y(&p, Z) <= s.work.bottom());
+        }
+    }
+
+    #[test]
+    fn bring_to_centre_works_on_a_secondary_monitor() {
+        let left = screen(-1920, 0, 1920, 1080, 40, 1.0, false);
+        let p = center_placement(&left, Z);
+        assert!(p.x < 0 && p.x as i64 + p.w as i64 <= 0);
     }
 }

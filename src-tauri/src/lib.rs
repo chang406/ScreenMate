@@ -1178,7 +1178,8 @@ pub fn run() {
             replay_fixture_session,
             desktop::hide_to_tray,
             desktop::sync_tray_state,
-            window_fit::report_character_zone
+            window_fit::report_character_zone,
+            window_fit::recenter_main
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } if window.label() == "settings" => {

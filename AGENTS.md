@@ -105,7 +105,7 @@ cargo build --release
 - 메인 창은 `skipTaskbar: true`, `visible: false`로 생성 → 저장된 위치 복원 후 `show()`. 트레이 생성 실패 시 작업표시줄 표시로 자동 복귀.
 - 트레이의 '항상 위'/'위치 잠금' 토글은 `tray-action` 이벤트로 오버레이(`main.js`)에 위임하고, 오버레이가 `sync_tray_state`로 체크 표시를 맞춥니다(상태의 단일 원천 = 오버레이 localStorage).
 - `app_config.json`을 수정할 때는 반드시 `update_app_config()`를 사용하십시오(동시 쓰기 직렬화).
-- 창 크기/위치는 `src-tauri/src/window_fit.rs`가 모니터 작업 영역에 맞춥니다. 시작·초기화 때는 `FitMode::KeepVisible`(캐릭터 전체가 보이게), 사용자가 드래그한 뒤에는 `FitMode::RescueOnly`(캐릭터가 1/3 미만만 보일 때만 되돌림)입니다. 사용자가 고른 위치를 되돌리는 규칙을 다시 엄격하게 만들지 마십시오. 640x920은 "최대(설계) 크기"이지 고정 크기가 아닙니다. 프론트엔드는 `window.innerWidth/innerHeight` 기준으로 캐릭터 크기를 계산해야 하며 920px을 가정하지 마십시오.
+- 창 크기/위치는 `src-tauri/src/window_fit.rs`가 모니터 작업 영역에 맞춥니다. 사용자가 드래그한 뒤에는 `FitMode::SizeOnly`(위치는 절대 바꾸지 않고 창 크기만 맞춤), 앱 시작 때는 `RescueOnly`(1/3 이상 보이게), "화면 가운데로 불러오기"는 `KeepVisible`입니다. 화면 가장자리에 걸치거나 숨기는 것은 의도된 사용법이므로 드래그 후 위치를 자동으로 되돌리는 규칙을 추가하지 마십시오. 640x920은 "최대(설계) 크기"이지 고정 크기가 아닙니다. 프론트엔드는 `window.innerWidth/innerHeight` 기준으로 캐릭터 크기를 계산해야 하며 920px을 가정하지 마십시오.
 
 ### ⑥-2 오프라인 런타임 (`src/lib/`)
 - `live2d-loader.js`가 Core → Pixi → 플러그인 순서로 로컬 우선 로드하고 결과를 `window.__live2dReady`로 노출합니다. `index.html`에 CDN `<script>`를 다시 직접 넣지 마십시오.

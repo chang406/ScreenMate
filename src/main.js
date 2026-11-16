@@ -1111,6 +1111,15 @@ toggleHitViewBtn?.addEventListener("click", (e) => {
   toggleHitView();
 });
 
+// 화면 가장자리로 숨겼거나 너무 멀리 보낸 캐릭터를 모니터 정중앙으로 불러오기
+document.getElementById("menu-recenter-btn")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  contextMenu.classList.add("hidden");
+  invoke("recenter_main")
+    .then(() => showSubtitle("🏠 여기 있어요!", 1800))
+    .catch((err) => console.error("recenter_main failed:", err));
+});
+
 menuHideBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
   contextMenu.classList.add("hidden");
