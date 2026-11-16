@@ -86,6 +86,7 @@ function mockTauriScript(configs) {
             if (cmd === "get_character_configs") return JSON.parse(JSON.stringify(configs));
             if (cmd === "get_app_settings") return {};
             if (cmd === "report_character_zone") window.__smoke.lastZone = args;
+            if (cmd === "begin_drag") window.__smoke.dragCalls++;
             return null;
           },
         },
