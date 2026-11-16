@@ -77,4 +77,4 @@ git diff --stat a98bebd..HEAD -- . ':!src/lib/vendor' ':!docs/autonomous_run/raw
 
 → 위 항목은 [`04_MANUAL_TEST_CHECKLIST.md`](./04_MANUAL_TEST_CHECKLIST.md)에서 사람이 직접 확인할 수 있도록 정리했습니다.
 
-> **이후 경과**: Windows CI(빌드·테스트·실행 확인)가 추가되었고, 원격 반영은 GitHub 권한 재연결로 해결되었습니다. 사용자의 실기기 테스트로 **이 표에서 "미검증"이던 영역에서 실제 결함이 나왔습니다**(배율 150% Live2D 위치, Windows 창 이동 제한 등). 결과와 수정 과정은 [`05_FOLLOWUP_HUMAN_LOOP.md`](./05_FOLLOWUP_HUMAN_LOOP.md)에 있습니다. 위 수치(테스트 26개 등)는 PR #1 시점 기준이며, 최종은 테스트 41개입니다.
+> **이후 경과**: Windows CI(빌드·테스트·실행 확인)가 추가되었고, 원격 반영은 GitHub 권한 재연결로 해결되었습니다. 사용자의 실기기 테스트로 **이 표에서 "미검증"이던 영역에서 실제 결함이 나왔습니다**(배율 150% Live2D 위치, Windows 창 이동 제한 등). 결과와 수정 과정은 [`05_FOLLOWUP_HUMAN_LOOP.md`](./05_FOLLOWUP_HUMAN_LOOP.md)에 있습니다. 위 수치(테스트 26개 등)는 PR #1 시점 기준이며, 피드백 단계 후 41개, 품질 점검 후속(PR #7·#8) 후 **55개**입니다.
