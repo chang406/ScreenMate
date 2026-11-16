@@ -733,3 +733,7 @@ pub async fn run(app: AppHandle, get_custom_paths_fn: impl Fn() -> Vec<String> +
         tokio::time::sleep(POLL_INTERVAL).await;
     }
 }
+
+#[cfg(test)]
+#[path = "session_watcher_tests.rs"]
+mod tests;

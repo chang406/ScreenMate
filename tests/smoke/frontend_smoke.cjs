@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+/**
+ * ScreenMate 프론트엔드 오프라인 스모크 테스트 (헤드리스 Chromium + Playwright)
+ *
+ * - `src/`를 로컬 정적 서버로 띄우고, 외부 네트워크(CDN 등) 요청을 전부 차단해 "오프라인" 환경을 재현합니다.
+ * - `window.__TAURI__`를 목(mock)으로 주입하여 Rust 백엔드 없이 오버레이(index.html)를 구동합니다.
+ * - 캐릭터별로 상태 이벤트(thinking → busy → talking → error)를 흘려보내고
+ *   말풍선 텍스트, 캐릭터 표시 여부, 런타임 에러, 차단된 외부 요청을 수집합니다.
+ *
+ * 사용법 (프로젝트 루트에서):
+ *   node tests/smoke/frontend_smoke.cjs --label before --out docs/autonomous_run/screens
+ *
+ * 출력: 콘솔에 JSON 요약, --out 디렉토리에 `<label>_<character>.png` 스크린샷.
+ * 필요: `playwright` 패키지와 Chromium (npm i -D playwright && npx playwright install chromium)
+ */
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const { chromium } = require("playwright");
+
+const ROOT = path.resolve(__dirname, "..", "..");
+const SRC = path.join(ROOT, "src");
+
+function arg(name, fallback) {
+  const i = process.argv.indexOf(`--${name}`);
+  return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+}
+const LABEL = arg("label", "run");
+const OUT = path.resolve(ROOT, arg("out", "docs/autonomous_run/screens"));
+const CHARACTERS = arg("characters", "pixel_cat,mao").split(",");
+
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".moc3": "application/octet-stream",
+};
+
+function startServer() {
+  const server = http.createServer((req, res) => {
+    const urlPath = decodeURIComponent(new URL(req.url, "http://x").pathname);
+    const filePath = path.join(SRC, urlPath === "/" ? "index.html" : urlPath);
+    if (!filePath.startsWith(SRC) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      res.writeHead(404);
+      res.end("not found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": MIME[path.extname(filePath)] || "application/octet-stream" });
+    fs.createReadStream(filePath).pipe(res);
+  });
+  return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
+}
+
+/** Rust `get_character_configs`와 동일한 방식으로 캐릭터 폴더를 스캔해 목 응답을 만든다. */
+function buildCharacterConfigs(active) {
+  const characters = {};
+  const base = path.join(SRC, "characters");
+  for (const name of fs.readdirSync(base)) {
+    if (name === "custom_characters") continue;
+    const p = path.join(base, name, "character.json");
+    if (fs.existsSync(p)) characters[name] = JSON.parse(fs.readFileSync(p, "utf8"));
+  }
+  return { activeCharacter: active, characters, globalBubbleSettings: null };
+}
+
+function mockTauriScript(configs) {
+  return `
+    (() => {
+      const listeners = {};
+      const configs = ${JSON.stringify(configs)};
+      window.__smoke = { invokes: [], bubbles: [] };
+      window.__TAURI__ = {
+        core: {
+          invoke: async (cmd, args) => {
+            window.__smoke.invokes.push(cmd);
+            if (cmd === "get_character_configs") return JSON.parse(JSON.stringify(configs));
+            if (cmd === "get_app_settings") return {};
+            return null;
+          },
+        },
+        event: {
+          listen: async (name, cb) => {
+            (listeners[name] = listeners[name] || []).push(cb);
+            return () => {};
+          },
+        },
+        window: {
+          getCurrentWindow: () => ({
+            startDragging: async () => {},
+            setPosition: async () => {},
+          }),
+        },
+      };
+      window.__mockEmit = (name, payload) => (listeners[name] || []).forEach((cb) => cb({ payload }));
+      document.addEventListener("DOMContentLoaded", () => {
+        const t = document.getElementById("bubble-text");
+        if (!t) return;
+        new MutationObserver(() => window.__smoke.bubbles.push(t.textContent)).observe(t, {
+          childList: true, characterData: true, subtree: true,
+        });
+      });
+    })();
+  `;
+}
+
+async function runCharacter(browser, baseUrl, key) {
+  const context = await browser.newContext({ viewport: { width: 640, height: 920 }, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  const blocked = [];
+  const pageErrors = [];
+  const consoleErrors = [];
+
+  // 오프라인 재현: 로컬 서버 외 모든 요청 차단
+  await page.route("**/*", (route) => {
+    const u = route.request().url();
+    if (u.startsWith(baseUrl)) return route.continue();
+    blocked.push(u);
+    return route.abort("internetdisconnected");
+  });
+  page.on("pageerror", (e) => pageErrors.push(String(e.message || e)));
+  page.on("console", (m) => {
+    if (m.type() === "error") consoleErrors.push(m.text());
+  });
+
+  await page.addInitScript(mockTauriScript(buildCharacterConfigs(key)));
+  await page.goto(baseUrl + "/index.html");
+  await page.waitForTimeout(3000);
+
+  const steps = [
+    ["thinking", null],
+    ["busy", "edit"],
+    ["talking", null],
+    ["error", null],
+  ];
+  const stateLog = [];
+  for (const [state, detail] of steps) {
+    await page.evaluate(([s, d]) => window.__mockEmit("state-change", { state: s, detail: d }), [state, detail]);
+    await page.waitForTimeout(1700); // thinking 최소 유지 1.5초 보장 이후 관찰
+    stateLog.push({
+      sent: state,
+      bubble: await page.evaluate(() => document.getElementById("bubble-text")?.textContent || ""),
+    });
+  }
+
+  const info = await page.evaluate(() => {
+    const img = document.getElementById("image-character");
+    const cvs = document.getElementById("live2d-canvas");
+    const vis = (el) => !!el && !el.classList.contains("hidden") && el.getBoundingClientRect().height > 0;
+    return {
+      PIXI: typeof window.PIXI,
+      PIXI_live2d: typeof (window.PIXI && window.PIXI.live2d),
+      Live2DCubismCore: typeof window.Live2DCubismCore,
+      imageVisible: vis(img) && img.naturalWidth > 0,
+      canvasVisible: vis(cvs),
+      charName: document.getElementById("char-name")?.textContent,
+      bubbleHistory: window.__smoke.bubbles.filter((b, i, a) => b && a.indexOf(b) === i),
+    };
+  });
+
+  fs.mkdirSync(OUT, { recursive: true });
+  const shot = path.join(OUT, `${LABEL}_${key}.png`);
+  await page.addStyleTag({ content: "html,body{background:#3b3f4a !important}" });
+  await page.screenshot({ path: shot });
+  await context.close();
+
+  return {
+    character: key,
+    ...info,
+    stateLog,
+    pageErrors,
+    consoleErrors,
+    blockedExternalRequests: blocked,
+    screenshot: path.relative(ROOT, shot),
+  };
+}
+
+(async () => {
+  const server = await startServer();
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch();
+  const results = [];
+  try {
+    for (const key of CHARACTERS) results.push(await runCharacter(browser, baseUrl, key));
+  } finally {
+    await browser.close();
+    server.close();
+  }
+  console.log(JSON.stringify({ label: LABEL, offline: true, results }, null, 2));
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
