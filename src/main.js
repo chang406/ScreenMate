@@ -506,6 +506,16 @@ function queueState(targetState, detail = null) {
   renderState(targetState, false, detail);
 }
 
+/**
+ * Pixi 스테이지 크기 (CSS 픽셀). `canvas.width/height`는 devicePixelRatio가 곱해진 *버퍼* 크기라
+ * Windows 배율 125%/150%에서 1.25~1.5배 커진다. 모델 좌표(스테이지)는 CSS 픽셀 단위이므로
+ * 버퍼 크기로 계산하면 캐릭터가 창 아래로 밀려나 보이지 않게 된다.
+ */
+function stageSize() {
+  if (pixiApp?.screen) return { w: pixiApp.screen.width, h: pixiApp.screen.height };
+  return { w: canvas.clientWidth || window.innerWidth, h: canvas.clientHeight || window.innerHeight };
+}
+
 function fitModelToCanvas() {
   if (!currentLive2DModel || !canvas) return;
   const model = currentLive2DModel;
@@ -514,15 +524,13 @@ function fitModelToCanvas() {
   const naturalHeight = model.height || 600;
 
   // 100% 기준 캐릭터 기본 비율 (640x920 창에서 약 46% 차지하여 200% 확대 시에도 상단 말풍선 공간 완벽 확보)
-  const baseScale = Math.min(
-    (canvas.width * 0.46) / naturalWidth,
-    (canvas.height * 0.46) / naturalHeight
-  );
+  const { w: stageW, h: stageH } = stageSize();
+  const baseScale = Math.min((stageW * 0.46) / naturalWidth, (stageH * 0.46) / naturalHeight);
 
   const finalScale = baseScale * currentScale;
   model.scale.set(finalScale);
-  model.x = (canvas.width - naturalWidth * finalScale) / 2;
-  model.y = canvas.height - naturalHeight * finalScale - 16;
+  model.x = (stageW - naturalWidth * finalScale) / 2;
+  model.y = stageH - naturalHeight * finalScale - 16;
 }
 
 async function setScale(scale, notify = true) {
@@ -772,10 +780,8 @@ function isOverCharacter(x, y) {
   if (charDef.type === "live2d" && currentLive2DModel) {
     const naturalWidth = currentLive2DModel.width || 500;
     const naturalHeight = currentLive2DModel.height || 600;
-    const baseScale = Math.min(
-      (canvas.width * 0.46) / naturalWidth,
-      (canvas.height * 0.46) / naturalHeight
-    );
+    const { w: stageW, h: stageH } = stageSize();
+    const baseScale = Math.min((stageW * 0.46) / naturalWidth, (stageH * 0.46) / naturalHeight);
     const finalScale = baseScale * currentScale;
     const charW = naturalWidth * finalScale;
     const charH = naturalHeight * finalScale;

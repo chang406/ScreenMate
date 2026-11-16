@@ -30,6 +30,8 @@ const OUT = path.resolve(ROOT, arg("out", "docs/autonomous_run/screens"));
 const CHARACTERS = arg("characters", "pixel_cat,mao").split(",");
 // 창(뷰포트) 크기. 작은 노트북에 맞춰 줄어든 창을 재현할 때 사용 (예: --viewport 640x560)
 const [VIEW_W, VIEW_H] = arg("viewport", "640x920").split("x").map(Number);
+// Windows 디스플레이 배율 재현 (예: --dpr 1.5 = 150%)
+const DPR = Number(arg("dpr", "1"));
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -112,7 +114,7 @@ function mockTauriScript(configs) {
 }
 
 async function runCharacter(browser, baseUrl, key) {
-  const context = await browser.newContext({ viewport: { width: VIEW_W, height: VIEW_H }, deviceScaleFactor: 1 });
+  const context = await browser.newContext({ viewport: { width: VIEW_W, height: VIEW_H }, deviceScaleFactor: DPR });
   const page = await context.newPage();
   const blocked = [];
   const pageErrors = [];
@@ -161,6 +163,8 @@ async function runCharacter(browser, baseUrl, key) {
       imageVisible: vis(img) && img.naturalWidth > 0,
       canvasVisible: vis(cvs),
       charName: document.getElementById("char-name")?.textContent,
+      devicePixelRatio: window.devicePixelRatio,
+      canvasBuffer: (() => { const c = document.getElementById("live2d-canvas"); return c ? [c.width, c.height, c.clientWidth, c.clientHeight] : null; })(),
       bubbleHistory: window.__smoke.bubbles.filter((b, i, a) => b && a.indexOf(b) === i),
     };
   });
