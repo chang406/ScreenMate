@@ -506,6 +506,78 @@ function queueState(targetState, detail = null) {
   renderState(targetState, false, detail);
 }
 
+/**
+ * Pixi 스테이지 크기 (CSS 픽셀). `canvas.width/height`는 devicePixelRatio가 곱해진 *버퍼* 크기라
+ * Windows 배율 125%/150%에서 1.25~1.5배 커진다. 모델 좌표(스테이지)는 CSS 픽셀 단위이므로
+ * 버퍼 크기로 계산하면 캐릭터가 창 아래로 밀려나 보이지 않게 된다.
+ */
+function stageSize() {
+  if (pixiApp?.screen) return { w: pixiApp.screen.width, h: pixiApp.screen.height };
+  return { w: canvas.clientWidth || window.innerWidth, h: canvas.clientHeight || window.innerHeight };
+}
+
+/**
+ * 캐릭터가 창 안에서 세로로 차지하는 범위(창 높이 대비 0~1)를 백엔드에 알린다.
+ * 백엔드(window_fit.rs)는 이 범위를 기준으로 "캐릭터가 화면 밖으로 나가지 않게"만 보정하므로,
+ * 캐릭터 위쪽의 투명한 빈 공간은 화면 위로 넘어가도 된다 → 캐릭터를 화면 맨 위까지 올릴 수 있음.
+ */
+function measureCharacterSpanPx() {
+  const charDef = config?.characters?.[currentKey];
+  if (charDef?.type === "live2d" && currentLive2DModel && pixiApp?.renderer?.gl) {
+    // 모델 경계 상자는 실제 그림보다 훨씬 클 수 있어(빈 캔버스 포함) 실제로 그려진 픽셀 행을 찾는다
+    try {
+      const renderer = pixiApp.renderer;
+      renderer.render(pixiApp.stage); // 같은 작업 안에서 바로 읽어야 버퍼가 유효함
+      const gl = renderer.gl;
+      const bw = gl.drawingBufferWidth;
+      const bh = gl.drawingBufferHeight;
+      const buf = new Uint8Array(bw * bh * 4);
+      gl.readPixels(0, 0, bw, bh, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      let topRow = -1;
+      let bottomRow = -1;
+      // WebGL 행 0 = 화면 맨 아래
+      for (let row = 0; row < bh; row++) {
+        const base = row * bw * 4;
+        let drawn = false;
+        for (let col = 0; col < bw; col += 2) {
+          if (buf[base + col * 4 + 3] > 40) { drawn = true; break; }
+        }
+        if (drawn) {
+          if (bottomRow === -1) bottomRow = row;
+          topRow = row;
+        }
+      }
+      if (topRow >= 0) {
+        const res = renderer.resolution || 1;
+        return { top: (bh - 1 - topRow) / res, bottom: (bh - bottomRow) / res };
+      }
+    } catch (e) {
+      console.warn("[ScreenMate] character span measure failed:", e);
+    }
+    const b = currentLive2DModel.getBounds();
+    return { top: b.y, bottom: b.y + b.height };
+  }
+  if (imgEl && !imgEl.classList.contains("hidden")) {
+    const r = imgEl.getBoundingClientRect();
+    if (r.height > 0) return { top: r.top, bottom: r.bottom };
+  }
+  return null;
+}
+
+let zoneReportTimer = null;
+function scheduleCharacterZoneReport(delay = 400) {
+  clearTimeout(zoneReportTimer);
+  zoneReportTimer = setTimeout(() => {
+    const span = measureCharacterSpanPx();
+    const h = window.innerHeight;
+    if (!span || !h) return;
+    // 모션(팔 올리기, 점프 등)으로 살짝 움직여도 잘리지 않도록 위아래 4% 여유
+    const top = Math.max(0, span.top / h - 0.04);
+    const bottom = Math.min(1, span.bottom / h + 0.02);
+    invoke("report_character_zone", { top, bottom }).catch(() => {});
+  }, delay);
+}
+
 function fitModelToCanvas() {
   if (!currentLive2DModel || !canvas) return;
   const model = currentLive2DModel;
@@ -514,15 +586,13 @@ function fitModelToCanvas() {
   const naturalHeight = model.height || 600;
 
   // 100% 기준 캐릭터 기본 비율 (640x920 창에서 약 46% 차지하여 200% 확대 시에도 상단 말풍선 공간 완벽 확보)
-  const baseScale = Math.min(
-    (canvas.width * 0.46) / naturalWidth,
-    (canvas.height * 0.46) / naturalHeight
-  );
+  const { w: stageW, h: stageH } = stageSize();
+  const baseScale = Math.min((stageW * 0.46) / naturalWidth, (stageH * 0.46) / naturalHeight);
 
   const finalScale = baseScale * currentScale;
   model.scale.set(finalScale);
-  model.x = (canvas.width - naturalWidth * finalScale) / 2;
-  model.y = canvas.height - naturalHeight * finalScale - 16;
+  model.x = (stageW - naturalWidth * finalScale) / 2;
+  model.y = stageH - naturalHeight * finalScale - 16;
 }
 
 async function setScale(scale, notify = true) {
@@ -535,11 +605,19 @@ async function setScale(scale, notify = true) {
   }
 
   if (imgEl) {
-    imgEl.style.transform = `scale(${currentScale})`;
+    // 창이 작은 화면에 맞춰 줄어든 경우(노트북 등) 확대해도 캐릭터가 창 밖으로 잘리지 않도록 상한 적용
+    // transform-origin이 하단이라 확대해도 이미지 하단(bottom)은 그대로 → 하단에서 위로 쓸 수 있는 높이로 상한 계산
+    // (상단 70px는 말풍선 자리)
+    const baseH = imgEl.offsetHeight;
+    const imgBottom = imgEl.getBoundingClientRect().bottom;
+    const maxFit = baseH > 0 && imgBottom > 0 ? (imgBottom - 70) / baseH : currentScale;
+    const effective = Math.min(currentScale, Math.max(0.3, maxFit));
+    imgEl.style.transform = `scale(${effective})`;
     imgEl.style.transformOrigin = "bottom center";
   }
 
   updateBubblePosition();
+  scheduleCharacterZoneReport();
 
   if (scaleSlider) scaleSlider.value = String(Math.round(currentScale * 100));
   if (scaleValueEl) scaleValueEl.textContent = `${Math.round(currentScale * 100)}%`;
@@ -725,6 +803,8 @@ async function switchCharacter(key) {
   }
   applyBubbleStyles();
   showSubtitle(charDef.name + " 준비 완료!", 2500);
+  // Live2D는 로드 직후 첫 모션이 자리 잡을 때까지 조금 기다렸다가 측정
+  scheduleCharacterZoneReport(charDef.type === "live2d" ? 1200 : 400);
 }
 
 async function switchRandomCharacter() {
@@ -765,10 +845,8 @@ function isOverCharacter(x, y) {
   if (charDef.type === "live2d" && currentLive2DModel) {
     const naturalWidth = currentLive2DModel.width || 500;
     const naturalHeight = currentLive2DModel.height || 600;
-    const baseScale = Math.min(
-      (canvas.width * 0.46) / naturalWidth,
-      (canvas.height * 0.46) / naturalHeight
-    );
+    const { w: stageW, h: stageH } = stageSize();
+    const baseScale = Math.min((stageW * 0.46) / naturalWidth, (stageH * 0.46) / naturalHeight);
     const finalScale = baseScale * currentScale;
     const charW = naturalWidth * finalScale;
     const charH = naturalHeight * finalScale;
@@ -805,6 +883,11 @@ listen("cursor-position", (event) => {
     setIgnoringCursor(true);
     return;
   }
+  // 앱이 직접 창을 옮기는 중에는 마우스를 놓을 때까지 클릭 관통을 끄고 이벤트를 계속 받는다
+  if (isWindowDragging) {
+    setIgnoringCursor(false);
+    return;
+  }
   const dpr = window.devicePixelRatio || 1;
   const onChar = isOverCharacter(x / dpr, y / dpr);
   setIgnoringCursor(!onChar);
@@ -817,6 +900,24 @@ let mouseDownX = 0;
 let mouseDownY = 0;
 let mouseDownTime = 0;
 let clickReactTimer = null;
+// 앱 주도 창 이동 중인지 (Windows 기본 창 이동은 창 꼭대기가 화면 위로 못 가게 막아서 직접 옮긴다)
+let isWindowDragging = false;
+
+function startWindowDrag() {
+  isWindowDragging = true;
+  invoke("begin_drag").catch((err) => {
+    // 구버전 백엔드 등 예외 시 기존 OS 드래그로 폴백
+    console.warn("begin_drag failed, falling back to OS drag:", err);
+    isWindowDragging = false;
+    appWindow.startDragging().catch(() => {});
+  });
+}
+
+function stopWindowDrag() {
+  if (!isWindowDragging) return;
+  isWindowDragging = false;
+  invoke("end_drag").catch(() => {});
+}
 
 function triggerClickReact() {
   renderState("click_react", true);
@@ -848,11 +949,17 @@ document.addEventListener("mousedown", (event) => {
 });
 
 document.addEventListener("mousemove", (event) => {
+  // 창 밖에서 버튼을 놓아 mouseup을 놓친 경우 대비
+  if (isWindowDragging && (event.buttons & 1) === 0) {
+    stopWindowDrag();
+    isDragging = false;
+    return;
+  }
   if (isMouseDown && !isDragging) {
     const dx = Math.abs(event.screenX - mouseDownX);
     const dy = Math.abs(event.screenY - mouseDownY);
 
-    // 6px 이상 움직였을 때만 창 드래그 시작 (Windows DefWindowProc로 전환)
+    // 6px 이상 움직였을 때만 창 드래그 시작 (앱이 커서 이동량만큼 창을 직접 옮김)
     if (dx > 6 || dy > 6) {
       isDragging = true;
       isMouseDown = false;
@@ -864,15 +971,18 @@ document.addEventListener("mousemove", (event) => {
         }
         return;
       }
-      appWindow.startDragging().catch((err) => {
-        console.error("startDragging failed:", err);
-      });
+      startWindowDrag();
     }
   }
 });
 
 // 클릭(탭) 인터랙션: 드래그하지 않고 제자리에서 뗐을 때 터치 반응 실행
 document.addEventListener("mouseup", (event) => {
+  if (event.button === 0 && isWindowDragging) {
+    stopWindowDrag();
+    isDragging = false;
+    return;
+  }
   if (event.button === 0 && isMouseDown) {
     isMouseDown = false;
     const dt = Date.now() - mouseDownTime;
@@ -885,6 +995,8 @@ document.addEventListener("mouseup", (event) => {
     isDragging = false;
   }
 });
+
+window.addEventListener("blur", () => stopWindowDrag());
 
 document.addEventListener("wheel", (e) => {
   e.preventDefault();
@@ -974,6 +1086,15 @@ sfxVolumeSlider?.addEventListener("change", () => {
   window.ScreenMateSfx?.play("click", { force: true });
 });
 
+// 화면 가장자리로 숨겼거나 너무 멀리 보낸 캐릭터를 모니터 정중앙으로 불러오기
+document.getElementById("menu-recenter-btn")?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  contextMenu.classList.add("hidden");
+  invoke("recenter_main")
+    .then(() => showSubtitle("🏠 여기 있어요!", 1800))
+    .catch((err) => console.error("recenter_main failed:", err));
+});
+
 menuHideBtn?.addEventListener("click", (e) => {
   e.stopPropagation();
   contextMenu.classList.add("hidden");
@@ -1002,13 +1123,16 @@ switchBtn.addEventListener("click", (e) => {
   switchRandomCharacter();
 });
 
+// 창 크기가 바뀌면(모니터 해상도/배율에 맞춘 자동 조정 포함) 캐릭터 크기를 다시 맞춘다
 window.addEventListener("resize", () => {
   if (pixiApp) {
     pixiApp.renderer.resize(window.innerWidth, window.innerHeight);
-    fitModelToCanvas();
-    updateBubblePosition();
   }
+  setScale(currentScale, false);
 });
+
+// 2D 이미지는 로드된 뒤에야 실제 높이를 알 수 있으므로 그때 크기 상한을 다시 계산
+imgEl.addEventListener("load", () => setScale(currentScale, false));
 
 listen("tray-action", (event) => {
   if (event.payload === "toggle_always_on_top") toggleAlwaysOnTop();

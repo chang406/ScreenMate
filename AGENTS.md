@@ -59,6 +59,7 @@ cargo build --release
   - 캔버스/이미지의 알파 채널(투명도)을 실시간 검사.
   - 마우스가 캐릭터 불투명 영역 위에 있으면 `invoke('set_click_through', { ignore: false })` (클릭/드래그 가능).
   - 마우스가 투명 영역이나 빈 공간에 있으면 `invoke('set_click_through', { ignore: true })` (마우스가 뒤의 작업 창으로 통과).
+- **창 드래그 (`cursor_watcher.rs` `begin_drag`/`end_drag`)**: OS 기본 창 이동(`startDragging`)은 창 꼭대기가 화면 위로 못 가게 막으므로 쓰지 않습니다. 프론트가 `begin_drag`를 호출하면 16ms 커서 폴링 루프가 커서 이동량만큼 `set_position`으로 창을 옮기고, 마우스를 놓거나(`mouseup`, `buttons==0`, 창 blur) 하면 `end_drag`합니다.
 - ⚠️ **주의**: 클릭 관통 로직을 무력화하거나 CSS `pointer-events: none`만으로 대체하지 마십시오 (OS 레벨 클릭 관통이 깨집니다).
 
 ### ② 세션 로그 감시 및 다중 에이전트 어댑터 아키텍처 (`session_watcher.rs`)
@@ -101,9 +102,10 @@ cargo build --release
 - `characters.json`에 새로운 2D 도트나 단순 Live2D 캐릭터를 등록할 때 특정 상태(예: `busy`, `error`)가 정의되어 있지 않더라도, `resolveFallbackState()` 함수를 통해 `thinking` -> `talking` -> `idle` 순으로 자동 대체되어 절대 런타임 오류가 발생하지 않습니다.
 
 ### ⑥-1 데스크톱 상주 (`src-tauri/src/desktop.rs`)
-- 메인 창은 `skipTaskbar: true`, `visible: false`로 생성 → 저장된 위치 복원 후 `show()`. 트레이 생성 실패 시 작업표시줄 표시로 자동 복귀.
+- 메인 창은 `skipTaskbar: true`, `visible: false`로 생성 → 주 모니터 정중앙에 배치 후 `show()` (마지막 위치 기억은 사용자 결정으로 제거됨). 트레이 생성 실패 시 작업표시줄 표시로 자동 복귀.
 - 트레이의 '항상 위'/'위치 잠금' 토글은 `tray-action` 이벤트로 오버레이(`main.js`)에 위임하고, 오버레이가 `sync_tray_state`로 체크 표시를 맞춥니다(상태의 단일 원천 = 오버레이 localStorage).
 - `app_config.json`을 수정할 때는 반드시 `update_app_config()`를 사용하십시오(동시 쓰기 직렬화).
+- 창 크기/위치는 `src-tauri/src/window_fit.rs`가 모니터 작업 영역에 맞춥니다. 사용자가 드래그한 뒤에는 `FitMode::SizeOnly`(위치는 절대 바꾸지 않고 창 크기만 맞춤), 앱 시작과 "화면 가운데로 불러오기"는 정중앙 배치(`KeepVisible`)입니다. 화면 가장자리에 걸치거나 숨기는 것은 의도된 사용법이므로 드래그 후 위치를 자동으로 되돌리는 규칙을 추가하지 마십시오. 640x920은 "최대(설계) 크기"이지 고정 크기가 아닙니다. 프론트엔드는 `window.innerWidth/innerHeight` 기준으로 캐릭터 크기를 계산해야 하며 920px을 가정하지 마십시오.
 
 ### ⑥-2 오프라인 런타임 (`src/lib/`)
 - `live2d-loader.js`가 Core → Pixi → 플러그인 순서로 로컬 우선 로드하고 결과를 `window.__live2dReady`로 노출합니다. `index.html`에 CDN `<script>`를 다시 직접 넣지 마십시오.
