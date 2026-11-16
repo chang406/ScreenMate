@@ -173,6 +173,9 @@ canvas#live2d-canvas {
   pointer-events: auto;
   box-sizing: border-box;
   animation: popup-scale 0.15s cubic-bezier(0, 0, 0.2, 1);
+  /* 창이 메뉴보다 낮으면(작은 화면에 맞춰 줄어든 경우) 잘리지 않고 스크롤 */
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
 }
 
 @keyframes popup-scale {

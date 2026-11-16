@@ -207,6 +207,16 @@ async function checkInteractions(page, key) {
   await page.mouse.click(center.x, center.y, { button: "right" });
   await page.waitForTimeout(250);
   out.contextMenuOpens = await page.evaluate(() => !document.getElementById("context-menu").classList.contains("hidden"));
+
+  // 1-1) 창 오른쪽 아래 구석에서 우클릭해도 메뉴 전체가 창 안에 들어오는지 (열림 애니메이션 이후)
+  await page.mouse.click(5, 5);
+  const vp = page.viewportSize();
+  await page.mouse.click(vp.width - 4, vp.height - 4, { button: "right" });
+  await page.waitForTimeout(350);
+  out.contextMenuInsideWindow = await page.evaluate(() => {
+    const r = document.getElementById("context-menu").getBoundingClientRect();
+    return r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
+  });
   if (key === CHARACTERS[0]) await page.screenshot({ path: path.join(OUT, `${LABEL}_context_menu.png`) });
 
   // 2) 크기 슬라이더

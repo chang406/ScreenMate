@@ -1030,10 +1030,12 @@ document.addEventListener("contextmenu", (e) => {
   contextMenu.style.top = "0px";
   contextMenu.classList.remove("hidden");
   
-  // 2. 정확한 렌더링 Bounding Rect 측정
-  const rect = contextMenu.getBoundingClientRect();
-  const menuWidth = rect.width > 0 ? rect.width : 220;
-  const menuHeight = rect.height > 0 ? rect.height : 265;
+  // 2. 메뉴 크기 측정
+  // getBoundingClientRect()는 열림 애니메이션(scale 0.92→1) 도중의 *줄어든* 크기를 돌려주므로
+  // 그대로 쓰면 실제보다 8% 작게 계산되어 메뉴 아래·오른쪽이 창 밖으로 잘린다.
+  // offsetWidth/offsetHeight는 transform의 영향을 받지 않는 실제 레이아웃 크기다.
+  const menuWidth = contextMenu.offsetWidth || 220;
+  const menuHeight = contextMenu.offsetHeight || 265;
   const winWidth = window.innerWidth;
   const winHeight = window.innerHeight;
 

@@ -125,6 +125,7 @@ jobs:
             if (!r.imageVisible) fail("character not visible");
             if (r.bubbleHistory.length < 3) fail("character did not react to state events");
             if (r.interactions.dragCallsLocked !== 0) fail("position lock did not prevent dragging");
+            if (r.interactions.contextMenuInsideWindow !== true) fail("context menu is clipped by the window edge");
             const h = r.interactions.hitTest;
             if (!h) fail("hit test probe missing");
             if (h.topLeftCornerHit) fail("transparent corner of the image should pass clicks through");
