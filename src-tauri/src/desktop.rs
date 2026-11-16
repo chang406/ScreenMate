@@ -55,7 +55,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let reset_position = MenuItem::with_id(
         app,
         "reset_position",
-        "위치·크기 초기화",
+        "캐릭터 화면 가운데로 불러오기",
         true,
         None::<&str>,
     )?;
@@ -93,7 +93,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             }
             "reset_position" => {
                 if let Some(win) = app.get_webview_window("main") {
-                    crate::window_fit::reset_main(&win);
+                    crate::window_fit::recenter(&win, true);
                 }
                 set_main_visible(app, true);
             }
@@ -225,7 +225,9 @@ pub fn place_main_at_startup(win: &WebviewWindow, config: &Value) {
     } else {
         crate::window_fit::place_default_main(win);
     }
-    crate::window_fit::refit_main(win, crate::window_fit::FitMode::KeepVisible);
+    // Something must be grabbable after start (a saved spot may come from another monitor
+    // setup), but a deliberately half-hidden character is otherwise left where it was.
+    crate::window_fit::refit_main(win, crate::window_fit::FitMode::RescueOnly);
 }
 
 /// Records a main-window move; the actual write happens in [`run_position_saver`].
@@ -265,8 +267,9 @@ pub async fn run_position_saver(app: AppHandle) {
             if let Some(win) = app.get_webview_window("main") {
                 // May move/resize the window; that emits `Moved` again and the corrected
                 // position is saved on the next settle (the second refit is a no-op).
-                // The user chose this spot: only pull the character back if it is almost lost.
-                crate::window_fit::refit_main(&win, crate::window_fit::FitMode::RescueOnly);
+                // The user chose this spot (peeking / hidden on purpose): never move it, only fit
+                // the window size if it landed on a different monitor.
+                crate::window_fit::refit_main(&win, crate::window_fit::FitMode::SizeOnly);
             }
             flush_position();
         }
