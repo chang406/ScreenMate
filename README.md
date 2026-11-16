@@ -215,7 +215,11 @@ ScreenMate/
 │   ├── tauri.conf.json            # 창 설정 (투명, 프레임리스, 항상위)
 │   └── src/
 │       ├── main.rs
-│       ├── lib.rs                 # 클릭 관통, 항상위 제어, 캐릭터/설정 커맨드
+│       ├── lib.rs                 # 앱 시작(run), 명령 등록, 클릭 관통·항상위·설정 창 제어
+│       ├── config.rs              # src 폴더 찾기, app_config.json 읽기/쓰기, 기본값
+│       ├── characters.rs          # 캐릭터 목록·선택·2D 저장·삭제, 말풍선 설정, ID 검증
+│       ├── live2d_import.rs       # 스마트 Live2D 임포터 (모션·표정 분석, 파일명 정리, 복사)
+│       ├── agent.rs               # AI 에이전트 연결 탭 (상태, 감시 경로, 모의 세션 재생)
 │       ├── desktop.rs             # 시스템 트레이, 시작 위치(화면 가운데)
 │       ├── window_fit.rs          # 모니터 크기·배율에 맞춘 창 크기, "화면 가운데로 불러오기"
 │       ├── cursor_watcher.rs      # 16ms OS 레벨 마우스 커서 감시
