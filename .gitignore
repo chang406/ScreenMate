@@ -34,3 +34,6 @@ src/characters/custom_characters/*
 # Local runtime application config
 src/app_config.json
 
+
+# Live2D Cubism Core (Live2D Inc. proprietary license) — place locally for offline use, see src/lib/README.md
+src/lib/live2dcubismcore.min.js

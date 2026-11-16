@@ -553,19 +553,50 @@ function updateAlwaysOnTopUI() {
   toggleTopBtn.style.opacity = isAlwaysOnTop ? "1" : "0.7";
 }
 
+/** Live2D 런타임(Cubism Core + Pixi + 플러그인) 로드 결과. lib/live2d-loader.js 참고 */
+async function getLive2DRuntime() {
+  if (window.__live2dReady) {
+    try {
+      return await window.__live2dReady;
+    } catch (e) {
+      return { ok: false, error: String(e?.message || e) };
+    }
+  }
+  const ok = typeof PIXI !== "undefined" && !!PIXI.live2d;
+  return { ok, error: ok ? null : "Live2D 런타임 없음" };
+}
+
+/** Live2D를 띄울 수 없을 때 대신 보여줄 2D 캐릭터 키 (냥이 우선) */
+function findImageFallbackKey() {
+  const chars = config?.characters || {};
+  if (chars.pixel_cat && chars.pixel_cat.type !== "live2d") return "pixel_cat";
+  return Object.keys(chars).find((k) => chars[k]?.type !== "live2d") || null;
+}
+
 async function loadLive2D(charDef) {
+  const runtime = await getLive2DRuntime();
+  if (!runtime.ok) {
+    console.warn("[ScreenMate] Live2D runtime unavailable:", runtime.error);
+    return { ok: false, reason: runtime.error || "Live2D 런타임 없음" };
+  }
+
   canvas.classList.remove("hidden");
   imgEl.classList.add("hidden");
 
   if (!pixiApp) {
-    pixiApp = new PIXI.Application({
-      view: canvas,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      backgroundAlpha: 0,
-      autoDensity: true,
-      resolution: window.devicePixelRatio || 1,
-    });
+    try {
+      pixiApp = new PIXI.Application({
+        view: canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        backgroundAlpha: 0,
+        autoDensity: true,
+        resolution: window.devicePixelRatio || 1,
+      });
+    } catch (err) {
+      console.error("PIXI init failed:", err);
+      return { ok: false, reason: "그래픽 초기화 실패: " + (err?.message || err) };
+    }
   }
 
   if (currentLive2DModel) {
@@ -580,11 +611,16 @@ async function loadLive2D(charDef) {
     currentLive2DModel = model;
     fitModelToCanvas();
     renderState(currentState, true);
-    return true;
+    return { ok: true };
   } catch (err) {
     console.error("Live2D load failed:", err);
-    showSubtitle("⚠️ Live2D 로드 실패: " + (err?.message || err), 4000);
-    return false;
+    let hint = "";
+    try {
+      // 모델(moc3)이 Cubism Core보다 최신이면 'Unknown error'만 나오므로 지원 버전을 함께 안내
+      const latest = window.Live2DCubismCore?.Version?.csmGetLatestMocVersion?.();
+      if (latest !== undefined) hint = ` · 현재 Cubism Core가 지원하는 moc3 버전 ≤ ${latest}, 최신 Core가 필요할 수 있어요`;
+    } catch (_) {}
+    return { ok: false, reason: "모델 로드 실패: " + (err?.message || err) + hint };
   }
 }
 
@@ -608,16 +644,29 @@ async function switchCharacter(key) {
   const charDef = config.characters[key];
   charNameEl.textContent = charDef.name || key;
 
-  let success = true;
   if (charDef.type === "live2d") {
-    success = await loadLive2D(charDef);
+    const result = await loadLive2D(charDef);
+    if (!result.ok) {
+      // 캐릭터가 통째로 사라지지 않도록 2D 캐릭터로 임시 대체 (설정은 바꾸지 않음 → 다음 실행 때 다시 시도)
+      const fallbackKey = findImageFallbackKey();
+      if (fallbackKey && fallbackKey !== key) {
+        currentKey = fallbackKey;
+        const fb = config.characters[fallbackKey];
+        charNameEl.textContent = fb.name || fallbackKey;
+        load2DImage(fb);
+        applyBubbleStyles();
+        showSubtitle(`⚠️ ${charDef.name || key}을(를) 띄울 수 없어 ${fb.name || fallbackKey}(으)로 대신 나왔어요 (${result.reason})`, 6000);
+      } else {
+        applyBubbleStyles();
+        showSubtitle("⚠️ Live2D 로드 실패: " + result.reason, 6000);
+      }
+      return;
+    }
   } else {
     load2DImage(charDef);
   }
   applyBubbleStyles();
-  if (success) {
-    showSubtitle(charDef.name + " 준비 완료!", 2500);
-  }
+  showSubtitle(charDef.name + " 준비 완료!", 2500);
 }
 
 async function switchRandomCharacter() {
