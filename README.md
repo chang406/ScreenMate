@@ -207,6 +207,7 @@ ScreenMate는 **폴더 기반 자체 완결형(Self-Contained Mod) 아키텍처*
 ScreenMate/
 ├── README.md                      # 프로젝트 소개 및 사용자 가이드
 ├── ROADMAP.md                     # 기능 개발 로드맵 & 아이디어 백로그
+├── CHANGELOG.md                   # 버전별 변경 내역 (추가/변경/수정/제거)
 ├── AGENTS.md                      # AI 에이전트 및 기여자를 위한 아키텍처 규약
 ├── PROJECT_HISTORY.md             # 프로젝트 개발 히스토리 및 문제 해결 맥락
 ├── docs/archive/                  # 완료된 과거 기획/구현 계획서 보관소

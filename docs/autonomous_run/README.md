@@ -10,7 +10,8 @@
 | 작업 브랜치 | `claude/agent-autonomous-development-w0d192` (main 아님) |
 | 시작 기준 커밋 | `a98bebd` (feat(v0.2.0): 다중 에이전트 어댑터 …) |
 | 수행 주체 | Claude Code (클라우드 컨테이너, Linux 헤드리스) |
-| 사람의 개입 | 최초 요청 1회 + "기록 문서도 만들어 달라" 추가 요청 1회. 그 외 검토/테스트 없음 |
+| 사람의 개입 | **자율 단계(PR #1)**: 최초 요청 1회 + "기록 문서도 만들어 달라" 추가 요청 1회, 그 외 검토/테스트 없음<br>**피드백 단계(PR #2~#5)**: 사용자가 Windows에서 직접 테스트하며 피드백 → [`05`](./05_FOLLOWUP_HUMAN_LOOP.md) |
+| 최종 결과 | PR #1~#5 모두 main에 머지 (2026-11-17), main CI 통과 |
 | 판단 기준 | 레포 자체의 [`AGENTS.md`](../../AGENTS.md)(철학·불변 규칙), [`ROADMAP.md`](../../ROADMAP.md)(미완 P0/P1) |
 
 ---
@@ -21,10 +22,11 @@
 2. [`02_PROCESS_LOG.md`](./02_PROCESS_LOG.md) — 단계별 타임라인: 무엇을, **왜** 골랐는지, 실행 명령과 결과, 실패/포기한 것
 3. [`03_AFTER.md`](./03_AFTER.md) — 같은 측정의 재실행 결과와 BEFORE 대비 비교표
 4. [`04_MANUAL_TEST_CHECKLIST.md`](./04_MANUAL_TEST_CHECKLIST.md) — 컨테이너에서 검증할 수 없었던 항목(Windows 실기기)을 사람이 직접 확인하는 체크리스트
+5. [`05_FOLLOWUP_HUMAN_LOOP.md`](./05_FOLLOWUP_HUMAN_LOOP.md) — 그 뒤 사용자 피드백으로 진행한 PR #2~#5의 과정과 **실험 결론**(자율 단계 vs 피드백 단계)
 
 보조 자료:
 - `raw/` — 측정 명령의 원본 출력(가공 전). `before_*` / `after_*` 쌍으로 비교 가능
-- `screens/` — 오프라인 스모크 테스트 스크린샷 `before_*.png` / `after_*.png`
+- `screens/` — 오프라인 스모크 테스트 스크린샷 `before_*.png` / `after_*.png`, 피드백 단계 전후 비교 `followup_*.png`(배율 150% Live2D, 클릭 영역 지도)
 
 ---
 
