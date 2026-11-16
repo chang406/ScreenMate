@@ -25,9 +25,8 @@ fn set_always_on_top(window: tauri::Window, always_on_top: bool) -> Result<(), S
     window.set_always_on_top(always_on_top).map_err(|e| e.to_string())
 }
 
-/// Saves pending state (window position) and exits the application.
+/// Exits the application.
 pub(crate) fn shutdown(app: &AppHandle) {
-    desktop::flush_position();
     app.exit(0);
 }
 
@@ -1186,14 +1185,12 @@ pub fn run() {
                 api.prevent_close();
                 let _ = window.hide();
             }
-            tauri::WindowEvent::Moved(pos) if window.label() == "main" => {
-                desktop::note_main_moved(pos.x, pos.y);
+            tauri::WindowEvent::Moved(_) if window.label() == "main" => {
+                desktop::note_main_moved();
             }
             // Dragged onto a monitor with a different DPI scale: refit once things settle.
             tauri::WindowEvent::ScaleFactorChanged { .. } if window.label() == "main" => {
-                if let Ok(pos) = window.outer_position() {
-                    desktop::note_main_moved(pos.x, pos.y);
-                }
+                desktop::note_main_moved();
             }
             _ => {}
         })
@@ -1216,14 +1213,13 @@ pub fn run() {
                 }
             }
 
-            // Place the window (saved position or default), fit it to the monitor so the
-            // character is always on-screen, then show it (main starts hidden to avoid a jump).
+            // Start at the centre of the primary monitor (window fitted to it), then show it
+            // (main starts hidden to avoid a visible jump).
             if let Some(main_win) = app.get_webview_window("main") {
-                let config = get_src_dir().map(|d| load_app_config(&d)).unwrap_or(Value::Null);
-                desktop::place_main_at_startup(&main_win, &config);
+                desktop::place_main_at_startup(&main_win);
                 let _ = main_win.show();
             }
-            tauri::async_runtime::spawn(desktop::run_position_saver(app.handle().clone()));
+            tauri::async_runtime::spawn(desktop::run_move_watcher(app.handle().clone()));
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

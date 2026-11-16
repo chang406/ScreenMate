@@ -8,8 +8,7 @@
 //! This module:
 //! - shrinks the window to fit the monitor's work area (taskbar excluded); the frontend scales the
 //!   character from the window size, so the character shrinks with it;
-//! - places the character fully on-screen at startup (a saved position from a bigger monitor
-//!   may not fit the laptop);
+//! - starts the app with the character at the centre of the primary monitor;
 //! - never moves the character after the *user* drags it (peeking from the screen edge or
 //!   flicking it away to hide is intended use) - only the window size is re-fitted when it lands
 //!   on a monitor of a different size / scale;
@@ -23,8 +22,6 @@ use tauri::{PhysicalPosition, PhysicalSize, Runtime, WebviewWindow};
 
 /// Design size of the overlay in logical pixels (see `tauri.conf.json`).
 pub const DESIGN_LOGICAL_SIZE: (f64, f64) = (640.0, 920.0);
-/// Gap kept between the window and the work-area edge for the default placement (logical px).
-const DEFAULT_MARGIN_LOGICAL: f64 = 8.0;
 
 /// Vertical span of the visible character inside the window, as fractions of the window height
 /// (0 = window top, 1 = window bottom). Reported by the overlay (`report_character_zone`) because
@@ -57,8 +54,8 @@ fn current_zone() -> CharacterZone {
 }
 
 /// Called by the overlay whenever the character's on-screen span changes (character switch,
-/// zoom, window resize). Schedules a refit so a character zoomed past the screen edge is pulled
-/// back once things settle.
+/// zoom, window resize). Used by "bring to centre" to centre the *character* rather than the
+/// window, and to re-centre once at startup when the real size becomes known.
 #[tauri::command]
 pub fn report_character_zone(window: tauri::Window, top: f64, bottom: f64) {
     if !(top.is_finite() && bottom.is_finite()) {
@@ -81,8 +78,9 @@ pub fn report_character_zone(window: tauri::Window, top: f64, bottom: f64) {
         })
         .unwrap_or(false);
     if changed && window.label() == "main" {
-        if let Ok(pos) = window.outer_position() {
-            crate::desktop::note_main_moved(pos.x, pos.y);
+        use tauri::Manager;
+        if let Some(win) = window.app_handle().get_webview_window("main") {
+            crate::desktop::on_character_measured(&win);
         }
     }
 }
@@ -92,16 +90,10 @@ pub fn report_character_zone(window: tauri::Window, top: f64, bottom: f64) {
 pub enum FitMode {
     /// The whole character must be visible. Used for "bring to centre".
     KeepVisible,
-    /// At least [`RESCUE_MIN_VISIBLE`] of the character must be visible. Used at app start so a
-    /// position saved on another monitor setup still leaves something to grab.
-    RescueOnly,
     /// Only fit the window size to the monitor; never move the character. Used after the user
     /// drags the character (or a DPI change while dragging).
     SizeOnly,
 }
-
-/// In [`FitMode::RescueOnly`], the share of the character's height that must stay on-screen.
-pub const RESCUE_MIN_VISIBLE: f64 = 1.0 / 3.0;
 
 /// A rectangle in physical pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -170,20 +162,6 @@ pub fn pick_screen(screens: &[Screen], x: i32, y: i32, w: u32, h: u32) -> Option
         .copied()
 }
 
-/// Default spot: bottom-right corner of the work area.
-pub fn default_placement(screen: &Screen) -> Placement {
-    let (w, h) = fitted_size(screen);
-    let margin = (DEFAULT_MARGIN_LOGICAL * screen.scale).round() as i64;
-    let x = (screen.work.right() - w as i64 - margin).max(screen.work.x as i64);
-    let y = screen.work.bottom() - h as i64;
-    Placement {
-        x: x as i32,
-        y: y as i32,
-        w,
-        h,
-    }
-}
-
 /// "Bring to centre": the character (not the window) centred in the work area, fully visible.
 pub fn center_placement(screen: &Screen, zone: CharacterZone) -> Placement {
     let (w, h) = fitted_size(screen);
@@ -240,14 +218,6 @@ pub fn plan_placement(
     let (min_y, max_y) = match mode {
         // Head not above the screen top, feet not below the work-area bottom.
         FitMode::KeepVisible => (work.y as i64 - char_top, work.bottom() - char_bottom),
-        // Anything goes as long as a third of the character is still on-screen.
-        FitMode::RescueOnly => {
-            let visible = ((char_bottom - char_top) as f64 * RESCUE_MIN_VISIBLE).round() as i64;
-            (
-                work.y as i64 + visible - char_bottom,
-                work.bottom() - visible - char_top,
-            )
-        }
         FitMode::SizeOnly => unreachable!("handled above"),
     };
     // If the character is taller than the screen (should not happen once fitted), keep the feet.
@@ -346,17 +316,6 @@ fn primary_screen(screens: &[Screen]) -> Option<Screen> {
         .find(|s| s.primary)
         .or_else(|| screens.first())
         .copied()
-}
-
-/// Places the main window for the first time when no usable saved position exists
-/// (bottom-right of the primary monitor).
-pub fn place_default_main<R: Runtime>(win: &WebviewWindow<R>) {
-    let Some(cur) = current_placement(win) else {
-        return;
-    };
-    if let Some(screen) = primary_screen(&screens_of(win)) {
-        apply(win, cur, default_placement(&screen));
-    }
 }
 
 /// Moves the character to the centre of a monitor.
@@ -584,16 +543,6 @@ mod tests {
     }
 
     #[test]
-    fn default_placement_is_bottom_right_inside_work_area() {
-        for s in [desktop(), laptop_125(), laptop_150_hidpi()] {
-            let p = default_placement(&s);
-            assert_eq!(p.y as i64 + p.h as i64, s.work.bottom(), "{s:?}");
-            assert!(p.x as i64 + p.w as i64 <= s.work.right(), "{s:?}");
-            assert!(p.x >= s.work.x, "{s:?}");
-        }
-    }
-
-    #[test]
     fn tiny_screen_never_produces_negative_or_inverted_ranges() {
         // Smaller than the window in both directions (e.g. a portrait 600x500 virtual display).
         let s = screen(0, 0, 600, 500, 40, 1.0, true);
@@ -601,53 +550,6 @@ mod tests {
         assert_eq!((p.w, p.h), (600, 460));
         assert!(feet_y(&p, Z) <= s.work.bottom());
         assert!(head_y(&p, Z) >= 0);
-    }
-
-    // --- RescueOnly: what happens after the *user* drags the character -----------------
-
-    const R: FitMode = FitMode::RescueOnly;
-
-    #[test]
-    fn user_drag_is_respected_even_if_head_goes_above_screen() {
-        // Reported: dragging the character to the very top made it snap back down a bit.
-        let s = screen(0, 0, 2560, 1440, 48, 1.0, true);
-        // Head 100px above the screen top: still mostly visible -> left alone.
-        let y = -(0.5 * 920.0) as i32 - 100;
-        assert_eq!(plan_placement(&s, 1000, y, 640, 920, Z, R).y, y);
-    }
-
-    #[test]
-    fn user_drag_is_respected_even_if_feet_go_behind_taskbar() {
-        let s = desktop();
-        // Feet 120px below the work-area bottom (behind the taskbar / off-screen).
-        let y = s.work.bottom() as i32 - (0.98 * 920.0) as i32 + 120;
-        assert_eq!(plan_placement(&s, 900, y, 640, 920, Z, R).y, y);
-    }
-
-    #[test]
-    fn almost_lost_character_is_rescued_so_it_can_be_grabbed() {
-        let s = desktop();
-        // Dragged so far down that only the top of the head would be visible.
-        let p = plan_placement(&s, 900, s.work.bottom() as i32 - 480, 640, 920, Z, R);
-        let char_h = feet_y(&p, Z) - head_y(&p, Z);
-        let visible = s.work.bottom() - head_y(&p, Z);
-        assert!(
-            visible as f64 >= char_h as f64 * RESCUE_MIN_VISIBLE - 1.0,
-            "at least a third must be visible: visible={visible}, char_h={char_h}"
-        );
-        // Same upwards.
-        let p = plan_placement(&s, 900, -900, 640, 920, Z, R);
-        let char_h = feet_y(&p, Z) - head_y(&p, Z);
-        let visible = feet_y(&p, Z) - s.work.y as i64;
-        assert!(visible as f64 >= char_h as f64 * RESCUE_MIN_VISIBLE - 1.0);
-    }
-
-    #[test]
-    fn rescue_mode_still_shrinks_window_on_small_screen() {
-        // Moving onto a smaller monitor still fits the window size (only the position rule is relaxed).
-        let s = laptop_125();
-        let p = plan_placement(&s, 100, 50, 800, 1150, Z, R);
-        assert_eq!((p.w, p.h), (800, 708));
     }
 
     // --- SizeOnly (after a user drag) & bring-to-centre ----------------------------------
