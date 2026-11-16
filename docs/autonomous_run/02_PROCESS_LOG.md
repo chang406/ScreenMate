@@ -22,6 +22,22 @@
   - `tests/smoke/frontend_smoke.cjs` — Rust 없이 오버레이를 헤드리스로 띄우는 오프라인 스모크(Tauri API 목 주입, 외부 요청 전부 차단).
 - **결과**: 7/14 실패, 오프라인 시 기본 캐릭터 미표시 등 → 상세는 [`01_BEFORE.md`](./01_BEFORE.md).
 - **관찰**: 컨테이너의 네트워크 정책상 `cdn.jsdelivr.net`, `cubism.live2d.com` 접근이 실제로 막혀 있음(HTTP 000). 즉 "오프라인 사용자" 상황이 이 환경에서 자연 재현됨.
-- **커밋 1**: 기록 문서 + 측정 도구 + 실패하는 테스트("red" 상태 그대로). 이 커밋을 체크아웃해 `cargo test`를 돌리면 BEFORE의 7건 실패를 그대로 재현할 수 있습니다.
+- **커밋 1** (`3b2dcc8`): 기록 문서 + 측정 도구 + 실패하는 테스트("red" 상태 그대로). 이 커밋을 체크아웃해 `cargo test`를 돌리면 BEFORE의 7건 실패를 그대로 재현할 수 있습니다.
+
+## Step 2. 세션 감시 엔진 견고화 (D1~D5 수정)
+
+- **결정 근거**: 앱의 존재 이유가 "에이전트 상태를 정확히 보여주기"이므로, 새 기능보다 분류 정확도와 이벤트 유실을 먼저 고침. 테스트가 이미 결함을 수치로 보여주고 있어 수정 효과를 객관적으로 검증 가능.
+- **변경** (`src-tauri/src/session_watcher.rs`):
+  - `Tail`: 바이트 단위로 읽고 **마지막 `\n`까지만 소비**, 나머지는 다음 폴링으로 이월(D1). `from_utf8_lossy`로 인코딩 경계 안전.
+  - `Tail::switch_to(path, StartAt)`: 앱 시작 시점의 세션은 끝에서 합류, 이후 새로 나타난 **작은(≤64KB) 세션은 첫 줄부터** 읽음(D5). 큰 파일(이어하기 세션)은 끝에서 시작해 과거 기록 재생 방지.
+  - 파일별 읽기 위치 기억(`known_positions`) → 두 세션을 번갈아 쓸 때도 사이에 쓰인 이벤트를 놓치지 않음 *(작업 중 추가 발견한 문제)*.
+  - 디렉토리 탐색: 150ms마다 → **1초마다 1회**, 세션 개수 집계와 최신 파일 탐색을 **한 번의 순회로 통합**(`scan_watch_roots`). 활성 파일 tail은 계속 150ms(반응 속도 동일)(D2).
+  - `ClaudeAdapter`: `tool_result`가 든 user 레코드 → `busy`, `isApiErrorMessage` → `error`, `isMeta`/`summary`/`file-history-snapshot` 무시, `system`+`level:error` → `error`, `[Request interrupted…]` → `idle`(D3).
+  - `ChatGptCodexAdapter`: Codex rollout `response_item`/`event_msg` 언래핑, 주입된 `<environment_context>` 무시, `apply_patch`→`edit`, `shell`→`command`(D4).
+  - `AgentRegistry`: 경로의 **도구 홈 폴더(`.claude`, `.codex`, `.gemini`) 컴포넌트**를 먼저 보고 소유 도구 판정. *(작업 중 추가 발견: Claude는 프로젝트 폴더명을 cwd로 짓기 때문에 `~/.claude/projects/-home-me-gemini-app/`이 기존 코드에서는 Antigravity로 오판됨.)* 경로로 도구가 확정되면 그 어댑터의 "무시" 판단을 존중(다른 어댑터로 재분류하지 않음).
+  - clippy 경고 3건 해소(`#[derive(Default)]`, `&dyn` 반환, 카운터 제거).
+- **테스트 추가**: 새 세션 첫 줄, 대용량 세션 끝 시작, 세션 교차 재개, 경로 오판, 인터럽트, Codex 주입 메시지 무시, 스캔 집계 → 총 21개.
+- **결과**: `cargo test` **21 통과 / 0 실패**(BEFORE 7/14) · `cargo clippy --all-targets` 경고 **0** · 벤치 `2.14ms/스캔 → 약 2.1ms CPU/s` (같은 머신에서 구 방식 환산 14.2ms CPU/s, BEFORE 측정 19.9ms CPU/s).
+- **주의/한계**: 실제 Claude Code·Codex 로그는 버전에 따라 필드가 바뀔 수 있음. 픽스처는 공개적으로 알려진 형태를 본떠 손으로 작성한 것이며, 실제 사용자 로그로 검증하지는 못함(→ 체크리스트에 포함).
 
 <!-- 이후 단계는 진행하면서 아래에 추가 -->

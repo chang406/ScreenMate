@@ -233,7 +233,7 @@ fn append(path: &Path, bytes: &[u8]) {
 /// Starts tailing `path` from its current end (the behaviour for an already-active file).
 fn tail_from_end(path: &Path) -> Tail {
     let mut tail = Tail::new();
-    tail.switch_to(path.to_path_buf());
+    tail.switch_to(path.to_path_buf(), StartAt::End);
     tail
 }
 
@@ -293,6 +293,105 @@ fn tail_resets_when_file_is_truncated() {
     assert_eq!(tail.read_new_records(), vec![json!({"y":1})]);
 }
 
+#[test]
+fn tail_reads_new_small_session_from_first_line() {
+    // A brand-new conversation file appears after the app started: its first prompt must not be skipped.
+    let dir = scratch_dir("tail_new_session");
+    let file = dir.join("new.jsonl");
+    append(&file, b"{\"type\":\"user\",\"message\":{\"content\":\"hi\"}}\n");
+    let mut tail = Tail::new();
+    tail.switch_to(file.clone(), StartAt::Resume);
+    assert_eq!(tail.read_new_records().len(), 1);
+}
+
+#[test]
+fn tail_large_unknown_session_starts_at_end() {
+    // A resumed conversation with long history must not replay its whole history.
+    let dir = scratch_dir("tail_big_session");
+    let file = dir.join("big.jsonl");
+    let line = format!("{{\"pad\":\"{}\"}}\n", "x".repeat(1024));
+    append(&file, line.repeat(100).as_bytes()); // ~100KB > NEW_SESSION_REPLAY_LIMIT
+    let mut tail = Tail::new();
+    tail.switch_to(file.clone(), StartAt::Resume);
+    assert!(tail.read_new_records().is_empty());
+    append(&file, b"{\"new\":true}\n");
+    assert_eq!(tail.read_new_records(), vec![json!({"new": true})]);
+}
+
+#[test]
+fn tail_resumes_when_alternating_between_sessions() {
+    // Two concurrently active sessions: lines written to A while B was active must still be delivered.
+    let dir = scratch_dir("tail_alternate");
+    let a = dir.join("a.jsonl");
+    let b = dir.join("b.jsonl");
+    append(&a, b"{\"a\":0}\n");
+    append(&b, b"");
+    let mut tail = Tail::new();
+    tail.switch_to(a.clone(), StartAt::End);
+    tail.switch_to(b.clone(), StartAt::Resume);
+    append(&a, b"{\"a\":1}\n");
+    append(&b, b"{\"b\":1}\n");
+    assert_eq!(tail.read_new_records(), vec![json!({"b":1})]);
+    tail.switch_to(a.clone(), StartAt::Resume);
+    assert_eq!(tail.read_new_records(), vec![json!({"a":1})]);
+}
+
+// ---------------------------------------------------------------------------
+// Path → tool attribution & discovery
+// ---------------------------------------------------------------------------
+
+#[test]
+fn claude_project_folder_mentioning_other_tool_is_still_claude() {
+    // Claude Code names project folders after the cwd, which may contain "gemini"/"codex".
+    let registry = AgentRegistry::new();
+    for p in [
+        "/home/u/.claude/projects/-home-u-gemini-app/s.jsonl",
+        "/home/u/.claude/projects/-home-u-codex-tools/s.jsonl",
+    ] {
+        assert_eq!(registry.match_adapter_for_path(Path::new(p)).map(|a| a.id()), Some("claude"), "{p}");
+    }
+    assert_eq!(
+        registry.match_adapter_for_path(Path::new("D:/logs/claude_backup/s.jsonl")).map(|a| a.id()),
+        Some("claude")
+    );
+}
+
+#[test]
+fn claude_interrupt_returns_to_idle() {
+    let rec = json!({
+        "type": "user",
+        "message": { "role": "user", "content": [{ "type": "text", "text": "[Request interrupted by user]" }] }
+    });
+    assert_eq!(classify_as(CLAUDE_PATH, rec), Some((AgentState::Idle, None)));
+}
+
+#[test]
+fn codex_injected_environment_context_is_ignored() {
+    let rec = json!({ "type": "response_item", "payload": { "type": "message", "role": "user",
+        "content": [{ "type": "input_text", "text": "<environment_context>\n  <cwd>~/p</cwd>\n</environment_context>" }] } });
+    assert_eq!(classify_as(CODEX_PATH, rec), None);
+}
+
+#[test]
+fn scan_counts_sessions_and_finds_latest() {
+    let dir = scratch_dir("scan");
+    let proj = dir.join("proj");
+    fs::create_dir_all(&proj).unwrap();
+    fs::write(proj.join("old.jsonl"), b"{}\n").unwrap();
+    fs::write(proj.join("transcript_full.jsonl"), b"{}\n").unwrap();
+    fs::write(proj.join("notes.txt"), b"x").unwrap();
+    std::thread::sleep(Duration::from_millis(20));
+    fs::write(proj.join("new.jsonl"), b"{}\n").unwrap();
+    let mut roots = vec![
+        WatchedPathInfo { path: dir.to_string_lossy().to_string(), source: "custom".into(), exists: true, session_count: 0 },
+        WatchedPathInfo { path: dir.join("missing").to_string_lossy().to_string(), source: "custom".into(), exists: false, session_count: 0 },
+    ];
+    let latest = scan_watch_roots(&mut roots);
+    assert_eq!(latest.as_deref(), Some(proj.join("new.jsonl").as_path()));
+    assert_eq!(roots[0].session_count, 2);
+    assert_eq!(roots[1].session_count, 0);
+}
+
 // ---------------------------------------------------------------------------
 // Session discovery cost (run manually: `cargo test -- --ignored --nocapture`)
 // ---------------------------------------------------------------------------
@@ -320,11 +419,13 @@ fn bench_find_latest_session_file() {
         assert!(find_latest_session_file(&info).is_some());
     }
     let per_call = start.elapsed() / iters;
-    let calls_per_sec = 1000.0 / POLL_INTERVAL.as_millis() as f64;
+    let ms = per_call.as_secs_f64() * 1000.0;
     println!(
-        "[bench] 2000 files: {:?} per full scan; at 150ms polling = {:.1} scans/s => ~{:.1} ms CPU/s spent scanning",
+        "[bench] 2000 files: {:?} per full scan; discovery walk every {}ms => ~{:.1} ms CPU/s spent scanning (old design: walk every {}ms => ~{:.1} ms CPU/s)",
         per_call,
-        calls_per_sec,
-        per_call.as_secs_f64() * 1000.0 * calls_per_sec
+        RESCAN_INTERVAL.as_millis(),
+        ms * 1000.0 / RESCAN_INTERVAL.as_millis() as f64,
+        POLL_INTERVAL.as_millis(),
+        ms * 1000.0 / POLL_INTERVAL.as_millis() as f64,
     );
 }
