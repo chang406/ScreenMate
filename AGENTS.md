@@ -102,6 +102,18 @@ cargo build --release
 ### ⑤ 스마트 폴백 (Smart Fallback)
 - `characters.json`에 새로운 2D 도트나 단순 Live2D 캐릭터를 등록할 때 특정 상태(예: `busy`, `error`)가 정의되어 있지 않더라도, `resolveFallbackState()` 함수를 통해 `thinking` -> `talking` -> `idle` 순으로 자동 대체되어 절대 런타임 오류가 발생하지 않습니다.
 
+### ⑥-0 백엔드 모듈 구성 (`src-tauri/src/`)
+| 파일 | 역할 |
+| :--- | :--- |
+| `lib.rs` | 앱 시작(`run`), Tauri 명령 등록, 창 제어 명령(클릭 관통·항상 위·설정 창·종료) |
+| `config.rs` | `src/` 폴더 찾기, `app_config.json` 읽기/쓰기(`update_app_config`), 기본 말풍선 설정 |
+| `characters.rs` | 캐릭터 목록·선택·2D 저장·삭제, 말풍선 설정. **경로가 되는 ID는 `validate_character_id`/`validate_segment`로 검증 필수** |
+| `live2d_import.rs` | Live2D 폴더 분석(키워드 사전·추천 규칙 표 `MOTION_RULES`/`EXPRESSION_RULES`), 파일명 정리, 복사·등록 |
+| `agent.rs` | AI 에이전트 연결 탭 명령(상태, 커스텀 감시 경로, 모의 세션 재생) |
+| `session_watcher.rs` / `cursor_watcher.rs` / `desktop.rs` / `window_fit.rs` | 세션 감시 / 커서·드래그 / 트레이·시작 위치 / 창 크기 맞춤 |
+
+새 명령은 역할에 맞는 파일에 `pub fn`으로 만들고 `lib.rs`의 `generate_handler!`에 `모듈::함수`로 등록합니다. 각 모듈의 단위 테스트는 같은 파일의 `#[cfg(test)] mod tests`에 둡니다(공용 헬퍼: `test_util.rs`).
+
 ### ⑥-1 데스크톱 상주 (`src-tauri/src/desktop.rs`)
 - 메인 창은 `skipTaskbar: true`, `visible: false`로 생성 → 주 모니터 정중앙에 배치 후 `show()` (마지막 위치 기억은 사용자 결정으로 제거됨). 트레이 생성 실패 시 작업표시줄 표시로 자동 복귀.
 - 트레이의 '항상 위'/'위치 잠금' 토글은 `tray-action` 이벤트로 오버레이(`main.js`)에 위임하고, 오버레이가 `sync_tray_state`로 체크 표시를 맞춥니다(상태의 단일 원천 = 오버레이 localStorage).
