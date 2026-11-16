@@ -83,6 +83,20 @@ pub fn report_character_zone(window: tauri::Window, top: f64, bottom: f64) {
     }
 }
 
+/// How strictly the character must be kept on-screen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FitMode {
+    /// The whole character must be visible. Used when *the environment* decides the position:
+    /// app start, tray "reset".
+    KeepVisible,
+    /// Respect where the user dragged the character; only intervene when it is almost lost
+    /// (less than [`RESCUE_MIN_VISIBLE`] of its height on-screen), so it can still be grabbed.
+    RescueOnly,
+}
+
+/// In [`FitMode::RescueOnly`], the share of the character's height that must stay on-screen.
+pub const RESCUE_MIN_VISIBLE: f64 = 1.0 / 3.0;
+
 /// A rectangle in physical pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Rect {
@@ -182,6 +196,7 @@ pub fn plan_placement(
     w: u32,
     h: u32,
     zone: CharacterZone,
+    mode: FitMode,
 ) -> Placement {
     let (fw, fh) = fitted_size(screen);
     // Keep bottom-centre fixed while resizing.
@@ -196,9 +211,18 @@ pub fn plan_placement(
 
     let char_top = (zone.top * fh as f64).round() as i64;
     let char_bottom = (zone.bottom * fh as f64).round() as i64;
-    // Head not above the screen top, feet not below the work-area bottom.
-    let min_y = work.y as i64 - char_top;
-    let max_y = work.bottom() - char_bottom;
+    let (min_y, max_y) = match mode {
+        // Head not above the screen top, feet not below the work-area bottom.
+        FitMode::KeepVisible => (work.y as i64 - char_top, work.bottom() - char_bottom),
+        // Anything goes as long as a third of the character is still on-screen.
+        FitMode::RescueOnly => {
+            let visible = ((char_bottom - char_top) as f64 * RESCUE_MIN_VISIBLE).round() as i64;
+            (
+                work.y as i64 + visible - char_bottom,
+                work.bottom() - visible - char_top,
+            )
+        }
+    };
     // If the character is taller than the screen (should not happen once fitted), keep the feet.
     ny = if max_y < min_y {
         max_y
@@ -274,7 +298,7 @@ fn current_placement<R: Runtime>(win: &WebviewWindow<R>) -> Option<Placement> {
 }
 
 /// Fits the main window to the monitor it is on and pulls it back on-screen if needed.
-pub fn refit_main<R: Runtime>(win: &WebviewWindow<R>) {
+pub fn refit_main<R: Runtime>(win: &WebviewWindow<R>, mode: FitMode) {
     let Some(cur) = current_placement(win) else {
         return;
     };
@@ -285,7 +309,7 @@ pub fn refit_main<R: Runtime>(win: &WebviewWindow<R>) {
     apply(
         win,
         cur,
-        plan_placement(&screen, cur.x, cur.y, cur.w, cur.h, current_zone()),
+        plan_placement(&screen, cur.x, cur.y, cur.w, cur.h, current_zone(), mode),
     );
 }
 
@@ -375,7 +399,7 @@ mod tests {
         // The reported bug: window at the OS default spot, its bottom (and the character) far
         // below the 768px screen.
         let s = laptop_125();
-        let p = plan_placement(&s, 100, 50, 800, 1150, Z);
+        let p = plan_placement(&s, 100, 50, 800, 1150, Z, FitMode::KeepVisible);
         assert_eq!((p.w, p.h), (800, 708));
         assert!(head_y(&p, Z) >= s.work.y as i64, "head visible: {p:?}");
         assert!(feet_y(&p, Z) <= s.work.bottom(), "feet visible: {p:?}");
@@ -389,11 +413,11 @@ mod tests {
         // puts the window's transparent top half above the screen - that must be allowed.
         let s = screen(0, 0, 2560, 1440, 48, 1.0, true);
         let wanted_y = -(0.5 * 920.0) as i32; // head exactly at y = 0
-        let p = plan_placement(&s, 1000, wanted_y, 640, 920, Z);
+        let p = plan_placement(&s, 1000, wanted_y, 640, 920, Z, FitMode::KeepVisible);
         assert_eq!(p.y, wanted_y, "must not be pushed back down");
         assert_eq!(head_y(&p, Z), 0);
         // ...but the head itself may not go above the screen.
-        let p = plan_placement(&s, 1000, wanted_y - 200, 640, 920, Z);
+        let p = plan_placement(&s, 1000, wanted_y - 200, 640, 920, Z, FitMode::KeepVisible);
         assert_eq!(head_y(&p, Z), 0);
     }
 
@@ -406,14 +430,14 @@ mod tests {
             bottom: 0.98,
         };
         let s = desktop();
-        let p = plan_placement(&s, 900, -400, 640, 920, big);
+        let p = plan_placement(&s, 900, -400, 640, 920, big, FitMode::KeepVisible);
         assert_eq!(head_y(&p, big), 0);
     }
 
     #[test]
     fn already_fitting_window_is_not_moved() {
         let s = desktop();
-        let p = plan_placement(&s, 900, 100, 640, 920, Z);
+        let p = plan_placement(&s, 900, 100, 640, 920, Z, FitMode::KeepVisible);
         assert_eq!(
             p,
             Placement {
@@ -428,7 +452,7 @@ mod tests {
     #[test]
     fn character_dragged_below_taskbar_is_pulled_up() {
         let s = desktop();
-        let p = plan_placement(&s, 900, 400, 640, 920, Z);
+        let p = plan_placement(&s, 900, 400, 640, 920, Z, FitMode::KeepVisible);
         assert_eq!(feet_y(&p, Z), s.work.bottom());
     }
 
@@ -436,15 +460,21 @@ mod tests {
     fn transparent_side_padding_may_hang_off_screen() {
         // A quarter of the width (160px) may be off-screen so the character can sit near the edge...
         let s = desktop();
-        assert_eq!(plan_placement(&s, -150, 100, 640, 920, Z).x, -150);
         assert_eq!(
-            plan_placement(&s, 1920 - 640 + 150, 100, 640, 920, Z).x,
+            plan_placement(&s, -150, 100, 640, 920, Z, FitMode::KeepVisible).x,
+            -150
+        );
+        assert_eq!(
+            plan_placement(&s, 1920 - 640 + 150, 100, 640, 920, Z, FitMode::KeepVisible).x,
             1920 - 640 + 150
         );
         // ...but not more, or the character itself would leave the screen.
-        assert_eq!(plan_placement(&s, -500, 100, 640, 920, Z).x, -160);
         assert_eq!(
-            plan_placement(&s, 1800, 100, 640, 920, Z).x,
+            plan_placement(&s, -500, 100, 640, 920, Z, FitMode::KeepVisible).x,
+            -160
+        );
+        assert_eq!(
+            plan_placement(&s, 1800, 100, 640, 920, Z, FitMode::KeepVisible).x,
             1920 - 640 + 160
         );
     }
@@ -453,7 +483,7 @@ mod tests {
     fn shrinking_keeps_bottom_centre_in_place() {
         // Window moved from a big monitor onto the laptop: same bottom edge & centre if possible.
         let s = screen(0, 0, 1366, 768, 60, 1.0, true); // 100%: wants 640x920, work height 708
-        let p = plan_placement(&s, 300, -212, 640, 920, Z); // bottom at 708
+        let p = plan_placement(&s, 300, -212, 640, 920, Z, FitMode::KeepVisible); // bottom at 708
         assert_eq!((p.w, p.h), (640, 708));
         assert_eq!(p.y as i64 + p.h as i64, 708);
         assert_eq!(p.x, 300);
@@ -478,7 +508,7 @@ mod tests {
             primary: true,
         };
         // Head would be under a 40px top taskbar if the window went higher.
-        let p = plan_placement(&s, 500, -600, 640, 920, Z);
+        let p = plan_placement(&s, 500, -600, 640, 920, Z, FitMode::KeepVisible);
         assert_eq!(head_y(&p, Z), 40);
     }
 
@@ -497,7 +527,7 @@ mod tests {
         let picked = pick_screen(&[main], 3000, 200, 640, 920).unwrap();
         assert!(picked.primary);
         // And the resulting placement is on that screen.
-        let p = plan_placement(&picked, 3000, 200, 640, 920, Z);
+        let p = plan_placement(&picked, 3000, 200, 640, 920, Z, FitMode::KeepVisible);
         assert!(p.x as i64 + p.w as i64 / 2 < main.work.right());
     }
 
@@ -515,9 +545,56 @@ mod tests {
     fn tiny_screen_never_produces_negative_or_inverted_ranges() {
         // Smaller than the window in both directions (e.g. a portrait 600x500 virtual display).
         let s = screen(0, 0, 600, 500, 40, 1.0, true);
-        let p = plan_placement(&s, -9999, 9999, 640, 920, Z);
+        let p = plan_placement(&s, -9999, 9999, 640, 920, Z, FitMode::KeepVisible);
         assert_eq!((p.w, p.h), (600, 460));
         assert!(feet_y(&p, Z) <= s.work.bottom());
         assert!(head_y(&p, Z) >= 0);
+    }
+
+    // --- RescueOnly: what happens after the *user* drags the character -----------------
+
+    const R: FitMode = FitMode::RescueOnly;
+
+    #[test]
+    fn user_drag_is_respected_even_if_head_goes_above_screen() {
+        // Reported: dragging the character to the very top made it snap back down a bit.
+        let s = screen(0, 0, 2560, 1440, 48, 1.0, true);
+        // Head 100px above the screen top: still mostly visible -> left alone.
+        let y = -(0.5 * 920.0) as i32 - 100;
+        assert_eq!(plan_placement(&s, 1000, y, 640, 920, Z, R).y, y);
+    }
+
+    #[test]
+    fn user_drag_is_respected_even_if_feet_go_behind_taskbar() {
+        let s = desktop();
+        // Feet 120px below the work-area bottom (behind the taskbar / off-screen).
+        let y = s.work.bottom() as i32 - (0.98 * 920.0) as i32 + 120;
+        assert_eq!(plan_placement(&s, 900, y, 640, 920, Z, R).y, y);
+    }
+
+    #[test]
+    fn almost_lost_character_is_rescued_so_it_can_be_grabbed() {
+        let s = desktop();
+        // Dragged so far down that only the top of the head would be visible.
+        let p = plan_placement(&s, 900, s.work.bottom() as i32 - 480, 640, 920, Z, R);
+        let char_h = feet_y(&p, Z) - head_y(&p, Z);
+        let visible = s.work.bottom() - head_y(&p, Z);
+        assert!(
+            visible as f64 >= char_h as f64 * RESCUE_MIN_VISIBLE - 1.0,
+            "at least a third must be visible: visible={visible}, char_h={char_h}"
+        );
+        // Same upwards.
+        let p = plan_placement(&s, 900, -900, 640, 920, Z, R);
+        let char_h = feet_y(&p, Z) - head_y(&p, Z);
+        let visible = feet_y(&p, Z) - s.work.y as i64;
+        assert!(visible as f64 >= char_h as f64 * RESCUE_MIN_VISIBLE - 1.0);
+    }
+
+    #[test]
+    fn rescue_mode_still_shrinks_window_on_small_screen() {
+        // Moving onto a smaller monitor still fits the window size (only the position rule is relaxed).
+        let s = laptop_125();
+        let p = plan_placement(&s, 100, 50, 800, 1150, Z, R);
+        assert_eq!((p.w, p.h), (800, 708));
     }
 }
