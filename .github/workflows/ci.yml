@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust (check · clippy · test)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev \
+            libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: cargo check --locked
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+
+  frontend:
+    name: Frontend (syntax · offline smoke)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: JavaScript syntax check
+        run: |
+          for f in src/*.js src/lib/*.js tests/smoke/*.cjs; do node --check "$f"; done
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save playwright@1
+          npx playwright install --with-deps chromium
+
+      - name: Offline smoke test (2D character)
+        run: |
+          node tests/smoke/frontend_smoke.cjs --label ci --characters pixel_cat --out smoke-out > smoke-out.json
+          node -e '
+            const r = require("./smoke-out.json").results[0];
+            const fail = (m) => { console.error("SMOKE FAIL:", m); process.exit(1); };
+            if (r.pageErrors.length) fail("page errors: " + r.pageErrors.join(" | "));
+            if (!r.imageVisible) fail("character not visible");
+            if (r.bubbleHistory.length < 3) fail("character did not react to state events");
+            if (r.interactions.dragCallsLocked !== 0) fail("position lock did not prevent dragging");
+            console.log("smoke ok:", JSON.stringify(r.stateLog));
+          '
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-screenshots
+          path: smoke-out/

@@ -75,6 +75,10 @@ cargo build --release
 - **프라이버시 안심 마스킹 (`maskHomePath`)**:
   - GUI 화면에서 사용자 로컬 경로(`C:\Users\<username>`)는 `~`로 자동 마스킹 표기되며, 마우스 오버 시 실제 전체 경로 툴팁 제공.
   - 커스텀 감시 경로는 `.gitignore`로 보호되는 로컬 `app_config.json`에만 저장되어 깃 푸시 시 노출 원천 차단.
+- **테일링 규칙**: 완성된 줄(`\n`)까지만 소비하고 기록 중인 반쪽 줄은 다음 폴링으로 넘깁니다. 새로 나타난 작은(≤64KB) 세션은 첫 줄부터, 앱 시작 시 이미 활성인 세션은 끝에서 합류합니다.
+- **탐색 주기**: 활성 파일 tail은 150ms, 새 세션 탐색(디렉토리 순회)은 1초 1회(`RESCAN_INTERVAL`). 매 폴링마다 전체 순회하는 코드로 되돌리지 마십시오.
+- **도구 판정**: 경로의 홈 폴더 컴포넌트(`.claude`, `.codex`, `.gemini`)를 우선합니다. 경로로 도구가 확정되면 해당 어댑터만 사용합니다(무시 판단 존중).
+- **테스트**: 어댑터나 테일링을 바꾸면 `src-tauri/src/session_watcher_tests.rs`와 `tests/fixtures/agents/`를 함께 갱신하고 `cargo test`를 통과시켜야 합니다.
 - **이중 파일 핑퐁 방지**: Antigravity의 `transcript_full.jsonl`은 파일 크기가 커서 오프셋 충돌을 유발하므로 **반드시 무시**하고 `transcript.jsonl`만 고정 감시해야 합니다.
 - **7가지 AgentState**:
   - `idle`: 대기 상태
@@ -95,6 +99,15 @@ cargo build --release
 
 ### ⑤ 스마트 폴백 (Smart Fallback)
 - `characters.json`에 새로운 2D 도트나 단순 Live2D 캐릭터를 등록할 때 특정 상태(예: `busy`, `error`)가 정의되어 있지 않더라도, `resolveFallbackState()` 함수를 통해 `thinking` -> `talking` -> `idle` 순으로 자동 대체되어 절대 런타임 오류가 발생하지 않습니다.
+
+### ⑥-1 데스크톱 상주 (`src-tauri/src/desktop.rs`)
+- 메인 창은 `skipTaskbar: true`, `visible: false`로 생성 → 저장된 위치 복원 후 `show()`. 트레이 생성 실패 시 작업표시줄 표시로 자동 복귀.
+- 트레이의 '항상 위'/'위치 잠금' 토글은 `tray-action` 이벤트로 오버레이(`main.js`)에 위임하고, 오버레이가 `sync_tray_state`로 체크 표시를 맞춥니다(상태의 단일 원천 = 오버레이 localStorage).
+- `app_config.json`을 수정할 때는 반드시 `update_app_config()`를 사용하십시오(동시 쓰기 직렬화).
+
+### ⑥-2 오프라인 런타임 (`src/lib/`)
+- `live2d-loader.js`가 Core → Pixi → 플러그인 순서로 로컬 우선 로드하고 결과를 `window.__live2dReady`로 노출합니다. `index.html`에 CDN `<script>`를 다시 직접 넣지 마십시오.
+- Live2D Cubism Core(독점 라이선스)는 레포에 커밋하지 않습니다(`.gitignore`).
 
 ### ⑥ GUI 캐릭터 매니저 및 멀티 윈도우 동기화
 - `tauri.conf.json`에 `settings` 윈도우를 `"visible": false`로 사전 선언(Pre-warmed)하여 앱 기동 시 백그라운드에서 초기화를 완료해 둡니다.
@@ -129,7 +142,8 @@ cargo build --release
 
 ## 6. 변경 시 필수 체크리스트 & 행동 수칙
 
-1. [ ] 백엔드 Rust 변경 시: `src-tauri`에서 `cargo check` 에러 0개 확인.
+1. [ ] 백엔드 Rust 변경 시: `src-tauri`에서 `cargo check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` 통과 확인 (CI와 동일).
+   - 프론트엔드 변경 시(선택): `node tests/smoke/frontend_smoke.cjs --label check` 로 오프라인 스모크 확인.
 2. [ ] 프론트엔드 변경 시: 마우스 클릭 관통 및 투명 배경이 정상 유지되는지 확인.
 3. [ ] **경로 표기 및 개인정보 보호 (중요)**: 마크다운(`README.md` 등) 및 코드 작성 시 개인 PC 절대 경로(`C:\Users\...`, `file:///...`)는 일절 사용을 금지하며, 반드시 **프로젝트 루트 기준의 상대 경로(Relative Path, 예: `src/...`)**만 작성할 것.
 4. [ ] 새 파일/설정 추가 시: 민감한 API 키나 개인 정보가 하드코딩되지 않았는지 확인.
