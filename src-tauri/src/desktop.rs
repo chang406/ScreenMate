@@ -6,6 +6,8 @@
 //!   `sync_tray_state` so the check marks always match.
 //! - Position: the main window's position is saved (debounced) into `app_config.json` as
 //!   `windowPosition` and restored at startup only if it is still on a connected monitor.
+//!   Size/position are then fitted to that monitor by [`crate::window_fit`] (startup, after every
+//!   drag settles, after a DPI change), and the tray offers a "reset position/size" escape hatch.
 
 use serde_json::{json, Value};
 use std::sync::Mutex;
@@ -50,6 +52,13 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     )?;
     let position_lock =
         CheckMenuItem::with_id(app, "position_lock", "위치 잠금", true, false, None::<&str>)?;
+    let reset_position = MenuItem::with_id(
+        app,
+        "reset_position",
+        "위치·크기 초기화",
+        true,
+        None::<&str>,
+    )?;
     let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
 
     let menu = Menu::with_items(
@@ -60,6 +69,8 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             &PredefinedMenuItem::separator(app)?,
             &always_on_top,
             &position_lock,
+            &PredefinedMenuItem::separator(app)?,
+            &reset_position,
             &PredefinedMenuItem::separator(app)?,
             &quit,
         ],
@@ -79,6 +90,12 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
             }
             "position_lock" => {
                 let _ = app.emit_to("main", "tray-action", "toggle_position_lock");
+            }
+            "reset_position" => {
+                if let Some(win) = app.get_webview_window("main") {
+                    crate::window_fit::reset_main(&win);
+                }
+                set_main_visible(app, true);
             }
             "quit" => crate::shutdown(app),
             _ => {}
@@ -195,8 +212,20 @@ pub fn restore_main_position(win: &WebviewWindow, config: &Value) {
     if is_position_visible((x, y), size, &monitors) {
         let _ = win.set_position(PhysicalPosition::new(x, y));
     } else {
-        println!("[desktop] saved position ({x}, {y}) is off-screen; keeping default position");
+        println!("[desktop] saved position ({x}, {y}) is off-screen; using default position");
+        crate::window_fit::place_default_main(win);
     }
+}
+
+/// Startup placement: saved position (if still visible) or the default spot, then fitted to the
+/// monitor so the character is never off-screen on a smaller / higher-DPI display.
+pub fn place_main_at_startup(win: &WebviewWindow, config: &Value) {
+    if saved_position(config).is_some() {
+        restore_main_position(win, config);
+    } else {
+        crate::window_fit::place_default_main(win);
+    }
+    crate::window_fit::refit_main(win);
 }
 
 /// Records a main-window move; the actual write happens in [`run_position_saver`].
@@ -222,7 +251,9 @@ pub fn flush_position() {
 }
 
 /// Background task: persists the window position once dragging has settled.
-pub async fn run_position_saver() {
+/// Background task: once a drag (or DPI / monitor change) has settled, fits the window to the
+/// monitor it landed on and persists the final position.
+pub async fn run_position_saver(app: AppHandle) {
     loop {
         tokio::time::sleep(Duration::from_millis(400)).await;
         let settled = PENDING_POSITION
@@ -231,6 +262,11 @@ pub async fn run_position_saver() {
             .and_then(|p| p.map(|(_, _, at)| at.elapsed() >= POSITION_SAVE_DEBOUNCE))
             .unwrap_or(false);
         if settled {
+            if let Some(win) = app.get_webview_window("main") {
+                // May move/resize the window; that emits `Moved` again and the corrected
+                // position is saved on the next settle (the second refit is a no-op).
+                crate::window_fit::refit_main(&win);
+            }
             flush_position();
         }
     }

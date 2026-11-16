@@ -535,7 +535,14 @@ async function setScale(scale, notify = true) {
   }
 
   if (imgEl) {
-    imgEl.style.transform = `scale(${currentScale})`;
+    // 창이 작은 화면에 맞춰 줄어든 경우(노트북 등) 확대해도 캐릭터가 창 밖으로 잘리지 않도록 상한 적용
+    // transform-origin이 하단이라 확대해도 이미지 하단(bottom)은 그대로 → 하단에서 위로 쓸 수 있는 높이로 상한 계산
+    // (상단 70px는 말풍선 자리)
+    const baseH = imgEl.offsetHeight;
+    const imgBottom = imgEl.getBoundingClientRect().bottom;
+    const maxFit = baseH > 0 && imgBottom > 0 ? (imgBottom - 70) / baseH : currentScale;
+    const effective = Math.min(currentScale, Math.max(0.3, maxFit));
+    imgEl.style.transform = `scale(${effective})`;
     imgEl.style.transformOrigin = "bottom center";
   }
 
@@ -1002,13 +1009,16 @@ switchBtn.addEventListener("click", (e) => {
   switchRandomCharacter();
 });
 
+// 창 크기가 바뀌면(모니터 해상도/배율에 맞춘 자동 조정 포함) 캐릭터 크기를 다시 맞춘다
 window.addEventListener("resize", () => {
   if (pixiApp) {
     pixiApp.renderer.resize(window.innerWidth, window.innerHeight);
-    fitModelToCanvas();
-    updateBubblePosition();
   }
+  setScale(currentScale, false);
 });
+
+// 2D 이미지는 로드된 뒤에야 실제 높이를 알 수 있으므로 그때 크기 상한을 다시 계산
+imgEl.addEventListener("load", () => setScale(currentScale, false));
 
 listen("tray-action", (event) => {
   if (event.payload === "toggle_always_on_top") toggleAlwaysOnTop();

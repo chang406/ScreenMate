@@ -1,6 +1,7 @@
 mod cursor_watcher;
 mod desktop;
 mod session_watcher;
+mod window_fit;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -1186,6 +1187,12 @@ pub fn run() {
             tauri::WindowEvent::Moved(pos) if window.label() == "main" => {
                 desktop::note_main_moved(pos.x, pos.y);
             }
+            // Dragged onto a monitor with a different DPI scale: refit once things settle.
+            tauri::WindowEvent::ScaleFactorChanged { .. } if window.label() == "main" => {
+                if let Ok(pos) = window.outer_position() {
+                    desktop::note_main_moved(pos.x, pos.y);
+                }
+            }
             _ => {}
         })
         .setup(|app| {
@@ -1207,14 +1214,14 @@ pub fn run() {
                 }
             }
 
-            // Restore last window position (main starts hidden to avoid a visible jump), then show.
+            // Place the window (saved position or default), fit it to the monitor so the
+            // character is always on-screen, then show it (main starts hidden to avoid a jump).
             if let Some(main_win) = app.get_webview_window("main") {
-                if let Ok(src_dir) = get_src_dir() {
-                    desktop::restore_main_position(&main_win, &load_app_config(&src_dir));
-                }
+                let config = get_src_dir().map(|d| load_app_config(&d)).unwrap_or(Value::Null);
+                desktop::place_main_at_startup(&main_win, &config);
                 let _ = main_win.show();
             }
-            tauri::async_runtime::spawn(desktop::run_position_saver());
+            tauri::async_runtime::spawn(desktop::run_position_saver(app.handle().clone()));
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
