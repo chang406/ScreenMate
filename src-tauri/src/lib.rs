@@ -143,6 +143,32 @@ pub(crate) fn update_app_config<F: FnOnce(&mut Value)>(mutate: F) -> Result<Valu
     Ok(config)
 }
 
+/// Validates a name that becomes a single path segment (character ID, state name, agent ID).
+///
+/// These values come from the webview and are joined onto real directories that are later
+/// written to or deleted with `remove_dir_all`. Without this check an ID such as `..` would
+/// resolve to the parent folder (e.g. `custom_characters/..` = every character). The settings UI
+/// already restricts input, but the backend is the last line of defence.
+fn validate_segment(value: &str, what: &str) -> Result<(), String> {
+    let ok = !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    if ok {
+        Ok(())
+    } else {
+        Err(format!(
+            "{what} '{value}'은(는) 사용할 수 없습니다. 영문, 숫자, '_', '-'만 1~64자로 입력해 주세요."
+        ))
+    }
+}
+
+/// Validates a character ID (folder name under `characters/` or `custom_characters/`).
+fn validate_character_id(id: &str) -> Result<(), String> {
+    validate_segment(id, "캐릭터 ID")
+}
+
 /// Finds the `character.json` file for a given character ID.
 /// Checks custom_characters first, then standard characters.
 fn find_character_json_path(src_dir: &Path, char_id: &str) -> Option<PathBuf> {
@@ -270,6 +296,7 @@ fn get_character_configs() -> Result<Value, String> {
 /// Sets the active character and notifies the main window.
 #[tauri::command]
 fn set_active_character(app: AppHandle, id: String) -> Result<(), String> {
+    validate_character_id(&id)?;
     update_app_config(|cfg| {
         if let Some(obj) = cfg.as_object_mut() {
             obj.insert("activeCharacter".to_string(), Value::String(id.clone()));
@@ -294,6 +321,11 @@ pub struct Save2DCharacterPayload {
 /// Saves a custom 2D image character to custom_characters/<id> and registers it in characters.json.
 #[tauri::command]
 fn save_2d_character(app: AppHandle, payload: Save2DCharacterPayload) -> Result<(), String> {
+    validate_character_id(&payload.id)?;
+    for state in payload.files.keys() {
+        // State names become file names (`<state>.<ext>`) inside the character folder.
+        validate_segment(state, "상태 이름")?;
+    }
     let src_dir = get_src_dir()?;
     let custom_char_dir = src_dir.join("characters").join("custom_characters").join(&payload.id);
     fs::create_dir_all(&custom_char_dir).map_err(|e| e.to_string())?;
@@ -544,9 +576,8 @@ fn parse_live2d_folder(folder_path: String) -> Result<Live2DParseResult, String>
 
     let model_filename = model_file_path
         .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "모델 파일 이름을 읽을 수 없습니다(지원하지 않는 문자).".to_string())?
         .to_string();
 
     // Actual directory containing the .model3.json
@@ -863,6 +894,13 @@ fn sanitize_live2d_filenames(custom_char_dir: &Path, id: &str, model_filename: &
 /// Imports and copies a Live2D character to custom_characters/<id> and registers it.
 #[tauri::command]
 fn save_live2d_character(app: AppHandle, payload: SaveLive2DCharacterPayload) -> Result<(), String> {
+    validate_character_id(&payload.id)?;
+    // The model file name must be a plain file name inside the copied folder.
+    if Path::new(&payload.model_filename).file_name().and_then(|n| n.to_str())
+        != Some(payload.model_filename.as_str())
+    {
+        return Err(format!("모델 파일 이름이 올바르지 않습니다: {}", payload.model_filename));
+    }
     let src_dir = get_src_dir()?;
     let custom_char_dir = src_dir.join("characters").join("custom_characters").join(&payload.id);
     
@@ -961,6 +999,7 @@ fn save_live2d_character(app: AppHandle, payload: SaveLive2DCharacterPayload) ->
 /// Deletes a custom character directory.
 #[tauri::command]
 fn delete_custom_character(app: AppHandle, id: String) -> Result<(), String> {
+    validate_character_id(&id)?;
     if id == "mao" || id == "pixel_cat" || id == "wanko" {
         return Err("기본 프리셋 캐릭터는 삭제할 수 없습니다.".into());
     }
@@ -1004,6 +1043,9 @@ fn save_bubble_settings(app: AppHandle, payload: SaveBubbleSettingsPayload) -> R
     let src_dir = get_src_dir()?;
 
     if let Some(target) = payload.target_id.as_deref() {
+        if target != "global" {
+            validate_character_id(target)?;
+        }
         if target == "global" {
             update_app_config(|cfg| {
                 if let Some(obj) = cfg.as_object_mut() {
@@ -1114,6 +1156,7 @@ fn remove_custom_watch_path(path: String) -> Result<(), String> {
 /// Replays a sample agent session fixture for testing without needing the tool installed.
 #[tauri::command]
 fn replay_fixture_session(app: AppHandle, agent_id: String) -> Result<(), String> {
+    validate_segment(&agent_id, "에이전트 ID")?;
     let src_dir = get_src_dir()?;
     let project_root = src_dir.parent().unwrap_or(&src_dir);
     let fixture_path = project_root
@@ -1251,4 +1294,33 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running screen-mate");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_character_ids_are_accepted() {
+        for id in ["mao", "pixel_cat", "my-char_2", "A", &"x".repeat(64)] {
+            assert!(validate_character_id(id).is_ok(), "{id}");
+        }
+    }
+
+    #[test]
+    fn path_like_or_odd_ids_are_rejected() {
+        // `..` would turn custom_characters/<id> into the parent folder (all characters).
+        for id in [
+            "", "..", ".", "../mao", "..\\mao", "a/b", "a\\b", "C:", "my char", "캐릭터", "x\0y",
+            &"x".repeat(65),
+        ] {
+            assert!(validate_character_id(id).is_err(), "{id:?} must be rejected");
+        }
+    }
+
+    #[test]
+    fn error_message_names_the_field() {
+        let err = validate_segment("..", "상태 이름").unwrap_err();
+        assert!(err.contains("상태 이름") && err.contains(".."));
+    }
 }

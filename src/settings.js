@@ -220,7 +220,7 @@ async function loadGallery() {
         thumbHtml = `<div class="card-thumb"><span class="live2d-avatar">${icon}</span></div>`;
       } else {
         const firstSrc = charDef.states?.idle?.src || Object.values(charDef.states || {})[0]?.src || "";
-        thumbHtml = `<div class="card-thumb"><img src="${firstSrc}" alt="${charDef.name}" /></div>`;
+        thumbHtml = `<div class="card-thumb"><img src="${escapeHtml(firstSrc)}" alt="${escapeHtml(charDef.name)}" /></div>`;
       }
 
       let typeBadgeClass = "badge-image";
@@ -242,13 +242,13 @@ async function loadGallery() {
         // 일반 모드: 모든 카드가 깔끔하게 1개의 버튼만 표시 (삭제 버튼 노출 X)
         actionsHtml = isCurrentActive
           ? '<button class="btn-primary btn-sm flex-1" disabled>현재 적용됨</button>'
-          : `<button class="btn-primary btn-sm flex-1 select-char-btn" data-id="${key}">선택하여 사용</button>`;
+          : `<button class="btn-primary btn-sm flex-1 select-char-btn" data-id="${escapeHtml(key)}">선택하여 사용</button>`;
       } else {
         // 삭제 모드: 프리셋은 비활성화, 커스텀 캐릭터는 삭제 실행 버튼 표시
         if (isPreset) {
           actionsHtml = '<button class="btn-sm flex-1 delete-overlay-btn preset-disabled" disabled>🔒 기본 프리셋 (삭제 불가)</button>';
         } else {
-          actionsHtml = `<button class="btn-sm flex-1 delete-overlay-btn delete-char-btn" data-id="${key}" data-name="${charDef.name}">🗑️ 이 캐릭터 삭제</button>`;
+          actionsHtml = `<button class="btn-sm flex-1 delete-overlay-btn delete-char-btn" data-id="${escapeHtml(key)}" data-name="${escapeHtml(charDef.name)}">🗑️ 이 캐릭터 삭제</button>`;
         }
       }
 
@@ -257,7 +257,7 @@ async function loadGallery() {
         <div class="card-top">
           ${thumbHtml}
           <div class="card-info">
-            <div class="card-name" title="${charDef.name}">${charDef.name}</div>
+            <div class="card-name" title="${escapeHtml(charDef.name)}">${escapeHtml(charDef.name)}</div>
             <span class="card-type-badge ${typeBadgeClass}">${typeLabel}</span>
           </div>
         </div>
@@ -1026,6 +1026,20 @@ const watchedPathsTbody = document.getElementById("watched-paths-tbody");
 const simBtns = document.querySelectorAll(".btn-sim");
 
 // 프라이버시 보호를 위해 로컬 사용자 홈 디렉토리(C:\Users\<username>)를 '~'로 안전하게 마스킹
+/**
+ * HTML에 끼워 넣는 문자열을 안전하게 만든다.
+ * 캐릭터 이름·경로는 character.json 등 사용자 파일에서 오므로, 따옴표나 <, > 가 들어 있으면
+ * 화면이 깨지거나(속성 조기 종료) 의도치 않은 HTML이 실행될 수 있다.
+ */
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function maskHomePath(pathStr) {
   if (!pathStr || typeof pathStr !== "string") return "-";
   let masked = pathStr
@@ -1110,7 +1124,7 @@ function renderAgentStatusUI(status) {
 
         return `
           <tr>
-            <td style="max-width: 280px; word-break: break-all; font-family: monospace;" title="실제 전체 경로: ${item.path}">${maskedPath}</td>
+            <td style="max-width: 280px; word-break: break-all; font-family: monospace;" title="실제 전체 경로: ${escapeHtml(item.path)}">${escapeHtml(maskedPath)}</td>
             <td>${typeBadge}</td>
             <td>${statusBadge}</td>
             <td>${item.session_count}개</td>
@@ -1133,8 +1147,8 @@ async function renderCustomPathsList() {
     customPathsList.innerHTML = paths
       .map(
         (p) => `
-      <div class="custom-path-item" title="실제 전체 경로: ${p}">
-        <span>📁 ${maskHomePath(p)}</span>
+      <div class="custom-path-item" title="실제 전체 경로: ${escapeHtml(p)}">
+        <span>📁 ${escapeHtml(maskHomePath(p))}</span>
         <button type="button" class="btn-remove-path" data-path="${encodeURIComponent(p)}" title="경로 제거">✕ 삭제</button>
       </div>
     `
