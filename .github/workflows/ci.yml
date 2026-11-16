@@ -4,9 +4,12 @@ on:
   push:
   pull_request:
 
+# PR: a newer push replaces the run in progress (only the latest commit matters).
+# main (and other branch pushes): every run finishes - it verifies what was actually merged,
+# and a late PR event must not cancel it (this happened once after merging PR #4).
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   rust:
@@ -16,7 +19,7 @@ jobs:
       run:
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Tauri system dependencies
         run: |
@@ -43,7 +46,7 @@ jobs:
       run:
         working-directory: src-tauri
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -87,7 +90,7 @@ jobs:
         shell: pwsh
         run: Get-Process screen-mate -ErrorAction SilentlyContinue | Stop-Process -Force
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: windows-launch
@@ -101,8 +104,8 @@ jobs:
     name: Frontend (syntax · offline smoke)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -134,7 +137,7 @@ jobs:
             console.log("smoke ok:", JSON.stringify(r.stateLog));
           '
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: smoke-screenshots
