@@ -29,6 +29,9 @@ const sfxVolumeRow = document.getElementById("sfx-volume-row");
 const sfxVolumeSlider = document.getElementById("sfx-volume");
 const sfxVolumeValueEl = document.getElementById("sfx-volume-value");
 const menuHideBtn = document.getElementById("menu-hide-btn");
+const hitIndicator = document.getElementById("hit-indicator");
+const toggleHitViewBtn = document.getElementById("toggle-hitview-btn");
+const hitViewStatusText = document.getElementById("hitview-status-text");
 const characterContainer = document.getElementById("character-container");
 
 let config = null;
@@ -58,6 +61,8 @@ let isAlwaysOnTop = localStorage.getItem("screenmate_always_on_top") !== "false"
 // 위치 잠금: 코딩 중 실수로 캐릭터를 끌어 옮기는 것을 방지 (클릭 반응은 유지)
 let isPositionLocked = localStorage.getItem("screenmate_position_locked") === "true";
 let lastLockHintTime = 0;
+// 클릭 영역 보기 (진단용, 저장하지 않음 → 재시작하면 꺼짐)
+let isHitViewOn = false;
 
 // 말풍선 설정 계산 및 스타일 적용
 function getActiveBubbleSettings() {
@@ -726,6 +731,8 @@ async function loadLive2D(charDef) {
         width: window.innerWidth,
         height: window.innerHeight,
         backgroundAlpha: 0,
+        // 픽셀 단위 클릭 판정(hittest.js)이 렌더링 이후에도 화면 픽셀을 읽을 수 있도록 유지
+        preserveDrawingBuffer: true,
         autoDensity: true,
         resolution: window.devicePixelRatio || 1,
       });
@@ -842,6 +849,17 @@ function isOverCharacter(x, y) {
   const charDef = config?.characters[currentKey];
   if (!charDef) return false;
 
+  // 1순위: 실제로 그려진 픽셀 기준 판정 (모든 캐릭터 공통, 여유 범위 포함)
+  const hitTest = window.ScreenMateHitTest;
+  if (hitTest) {
+    const pixelResult =
+      charDef.type === "live2d" && currentLive2DModel
+        ? hitTest.live2d(pixiApp, currentLive2DModel, x, y)
+        : hitTest.image(imgEl, x, y);
+    if (pixelResult !== null) return pixelResult;
+  }
+
+  // 2순위(판정 불가 시): 기존 사각형 판정
   if (charDef.type === "live2d" && currentLive2DModel) {
     const naturalWidth = currentLive2DModel.width || 500;
     const naturalHeight = currentLive2DModel.height || 600;
@@ -891,7 +909,41 @@ listen("cursor-position", (event) => {
   const dpr = window.devicePixelRatio || 1;
   const onChar = isOverCharacter(x / dpr, y / dpr);
   setIgnoringCursor(!onChar);
+  if (isHitViewOn) updateHitIndicator(x / dpr, y / dpr, onChar);
 });
+
+function updateHitIndicator(x, y, onChar) {
+  hitIndicator.style.left = `${x}px`;
+  hitIndicator.style.top = `${y}px`;
+  hitIndicator.classList.toggle("on-character", onChar);
+  hitIndicator.classList.remove("hidden");
+}
+
+function toggleHitView() {
+  isHitViewOn = !isHitViewOn;
+  hitViewStatusText.textContent = isHitViewOn ? "클릭 영역 보기: ON" : "클릭 영역 보기: OFF";
+  toggleHitViewBtn.style.opacity = isHitViewOn ? "1" : "0.7";
+  if (!isHitViewOn) hitIndicator.classList.add("hidden");
+  showSubtitle(
+    isHitViewOn ? "🎯 초록 = 클릭됨 / 회색 = 뒤 창으로 통과" : "🎯 클릭 영역 보기 꺼짐",
+    2500
+  );
+}
+
+// 테스트·진단용 훅 (스모크 테스트에서 판정 결과를 직접 확인)
+window.__screenmateDebug = {
+  isOverCharacter,
+  /** 현재 캐릭터의 경계 상자 (CSS px) */
+  characterBounds() {
+    const charDef = config?.characters?.[currentKey];
+    if (charDef?.type === "live2d" && currentLive2DModel) {
+      const b = currentLive2DModel.getBounds();
+      return { left: b.x, top: b.y, right: b.x + b.width, bottom: b.y + b.height };
+    }
+    const r = imgEl.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  },
+};
 
 // 마우스 클릭 / 드래그 판정 변수
 let isMouseDown = false;
@@ -1012,10 +1064,12 @@ document.addEventListener("contextmenu", (e) => {
   contextMenu.style.top = "0px";
   contextMenu.classList.remove("hidden");
   
-  // 2. 정확한 렌더링 Bounding Rect 측정
-  const rect = contextMenu.getBoundingClientRect();
-  const menuWidth = rect.width > 0 ? rect.width : 220;
-  const menuHeight = rect.height > 0 ? rect.height : 265;
+  // 2. 메뉴 크기 측정
+  // getBoundingClientRect()는 열림 애니메이션(scale 0.92→1) 도중의 *줄어든* 크기를 돌려주므로
+  // 그대로 쓰면 실제보다 8% 작게 계산되어 메뉴 아래·오른쪽이 창 밖으로 잘린다.
+  // offsetWidth/offsetHeight는 transform의 영향을 받지 않는 실제 레이아웃 크기다.
+  const menuWidth = contextMenu.offsetWidth || 220;
+  const menuHeight = contextMenu.offsetHeight || 265;
   const winWidth = window.innerWidth;
   const winHeight = window.innerHeight;
 
@@ -1084,6 +1138,11 @@ sfxVolumeSlider?.addEventListener("input", () => {
 
 sfxVolumeSlider?.addEventListener("change", () => {
   window.ScreenMateSfx?.play("click", { force: true });
+});
+
+toggleHitViewBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleHitView();
 });
 
 // 화면 가장자리로 숨겼거나 너무 멀리 보낸 캐릭터를 모니터 정중앙으로 불러오기
@@ -1193,6 +1252,7 @@ async function init() {
     updateAlwaysOnTopUI();
     updateLockUI();
     updateSfxUI();
+    if (toggleHitViewBtn) toggleHitViewBtn.style.opacity = "0.7";
     applyBubbleStyles();
   } catch (e) {
     console.error("Init failed:", e);

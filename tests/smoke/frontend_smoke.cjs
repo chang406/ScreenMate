@@ -208,6 +208,16 @@ async function checkInteractions(page, key) {
   await page.mouse.click(center.x, center.y, { button: "right" });
   await page.waitForTimeout(250);
   out.contextMenuOpens = await page.evaluate(() => !document.getElementById("context-menu").classList.contains("hidden"));
+
+  // 1-1) 창 오른쪽 아래 구석에서 우클릭해도 메뉴 전체가 창 안에 들어오는지 (열림 애니메이션 이후)
+  await page.mouse.click(5, 5);
+  const vp = page.viewportSize();
+  await page.mouse.click(vp.width - 4, vp.height - 4, { button: "right" });
+  await page.waitForTimeout(350);
+  out.contextMenuInsideWindow = await page.evaluate(() => {
+    const r = document.getElementById("context-menu").getBoundingClientRect();
+    return r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
+  });
   if (key === CHARACTERS[0]) await page.screenshot({ path: path.join(OUT, `${LABEL}_context_menu.png`) });
 
   // 2) 크기 슬라이더
@@ -272,6 +282,37 @@ async function checkInteractions(page, key) {
       return { enabled, played, audioContextAvailable: !!(window.AudioContext || window.webkitAudioContext) };
     });
   } else out.sfx = null;
+
+  // 5) 픽셀 단위 클릭 판정: 캐릭터 경계 상자 안을 격자로 찍어 "클릭됨" 비율과 모서리/바깥 결과 확인
+  out.hitTest = await page.evaluate(() => {
+    const dbg = window.__screenmateDebug;
+    if (!dbg || !dbg.characterBounds) return null;
+    document.getElementById("context-menu").classList.add("hidden");
+    const b = dbg.characterBounds();
+    const N = 15;
+    let hits = 0;
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const x = b.left + ((i + 0.5) / N) * (b.right - b.left);
+        const y = b.top + ((j + 0.5) / N) * (b.bottom - b.top);
+        if (dbg.isOverCharacter(x, y)) hits++;
+      }
+    }
+    // 가운데 가로줄에서 왼쪽부터 처음 "클릭됨"이 되는 지점
+    const midY = (b.top + b.bottom) / 2;
+    let firstHitX = null;
+    for (let x = Math.floor(b.left) - 20; x <= b.right; x++) {
+      if (dbg.isOverCharacter(x, midY)) { firstHitX = x; break; }
+    }
+    return {
+      bounds: { left: Math.round(b.left), top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) },
+      gridHits: hits,
+      gridTotal: N * N,
+      topLeftCornerHit: dbg.isOverCharacter(b.left + 2, b.top + 2),
+      farOutsideHit: dbg.isOverCharacter(4, 4),
+      midRowFirstHitX: firstHitX,
+    };
+  });
 
   out.invokedCommands = await page.evaluate(() => [...new Set(window.__smoke.invokes)]);
   return out;

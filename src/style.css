@@ -173,6 +173,9 @@ canvas#live2d-canvas {
   pointer-events: auto;
   box-sizing: border-box;
   animation: popup-scale 0.15s cubic-bezier(0, 0, 0.2, 1);
+  /* 창이 메뉴보다 낮으면(작은 화면에 맞춰 줄어든 경우) 잘리지 않고 스크롤 */
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
 }
 
 @keyframes popup-scale {
@@ -258,6 +261,26 @@ canvas#live2d-canvas {
 
 .menu-icon {
   font-size: 13px;
+}
+
+/* 클릭 영역 보기: 마우스 위치 표시 링 (클릭을 가로채지 않음) */
+#hit-indicator {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  border: 2px dashed rgba(200, 200, 210, 0.85);
+  background: rgba(120, 120, 130, 0.15);
+  pointer-events: none;
+  z-index: 400;
+  transition: border-color 0.08s ease, background 0.08s ease;
+}
+
+#hit-indicator.on-character {
+  border: 2px solid #4ade80;
+  background: rgba(74, 222, 128, 0.25);
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
 }
 
 /* 크기 / 볼륨 미세 조절 슬라이더 */
