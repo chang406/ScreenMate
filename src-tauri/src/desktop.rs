@@ -225,7 +225,7 @@ pub fn place_main_at_startup(win: &WebviewWindow, config: &Value) {
     } else {
         crate::window_fit::place_default_main(win);
     }
-    crate::window_fit::refit_main(win);
+    crate::window_fit::refit_main(win, crate::window_fit::FitMode::KeepVisible);
 }
 
 /// Records a main-window move; the actual write happens in [`run_position_saver`].
@@ -265,7 +265,8 @@ pub async fn run_position_saver(app: AppHandle) {
             if let Some(win) = app.get_webview_window("main") {
                 // May move/resize the window; that emits `Moved` again and the corrected
                 // position is saved on the next settle (the second refit is a no-op).
-                crate::window_fit::refit_main(&win);
+                // The user chose this spot: only pull the character back if it is almost lost.
+                crate::window_fit::refit_main(&win, crate::window_fit::FitMode::RescueOnly);
             }
             flush_position();
         }
