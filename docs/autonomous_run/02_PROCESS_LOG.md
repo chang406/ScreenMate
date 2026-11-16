@@ -106,7 +106,13 @@
 
 ## Step 8. 마무리 커밋 & 푸시
 
-- **커밋 5**: CI + AFTER 측정 + 문서.
+- **커밋 5** (`2824b9a`): CI + AFTER 측정 + 문서.
 - **푸시**: 아래 "최종 상태" 참고.
 
-<!-- 최종 상태는 아래에 추가 -->
+## 최종 상태
+
+- 브랜치 `claude/agent-autonomous-development-w0d192`에 기준 커밋 `a98bebd` 이후 **6개 커밋**(이 기록 갱신 포함).
+- **원격 푸시 실패(2회 시도)**: `403 — Claude doesn't have GitHub access to chang406/ScreenMate`. 네트워크 문제가 아니라 권한 문제여서 재시도로 해결되지 않음.
+  - 해결 방법: claude.ai에서 GitHub 연결을 다시 하거나 저장소에 Claude GitHub App을 설치한 뒤 다시 푸시.
+  - 대안: 세션에서 함께 전달한 `git bundle` 파일로 로컬에 그대로 가져올 수 있음 → `git fetch <bundle 파일> claude/agent-autonomous-development-w0d192:claude/agent-autonomous-development-w0d192`
+- main 브랜치, 원격 저장소, PR에는 **아무 변경도 하지 않음**.
