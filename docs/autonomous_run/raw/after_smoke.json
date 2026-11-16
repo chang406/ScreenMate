@@ -1,0 +1,212 @@
+{
+  "label": "after",
+  "offline": true,
+  "results": [
+    {
+      "character": "pixel_cat",
+      "PIXI": "object",
+      "PIXI_live2d": "undefined",
+      "Live2DCubismCore": "undefined",
+      "imageVisible": true,
+      "canvasVisible": false,
+      "charName": "냥이 (2D Cat)",
+      "bubbleHistory": [
+        "(화면 집중 중)",
+        "코드 꼼꼼히 작성 중! ✨",
+        "결과 나왔다냥!",
+        "빨간 불 떴다냥!"
+      ],
+      "interactions": {
+        "contextMenuOpens": true,
+        "scaleSliderTo150": {
+          "stored": "1.5",
+          "label": "150%"
+        },
+        "dragCallsUnlocked": 1,
+        "lockedStored": "true",
+        "dragCallsLocked": 0,
+        "unlockedViaTrayStored": "false",
+        "sfx": {
+          "enabled": true,
+          "played": [
+            [
+              "talking",
+              true
+            ]
+          ],
+          "audioContextAvailable": true
+        },
+        "invokedCommands": [
+          "get_character_configs",
+          "set_always_on_top",
+          "sync_tray_state"
+        ]
+      },
+      "stateLog": [
+        {
+          "sent": "thinking",
+          "bubble": "(화면 집중 중)"
+        },
+        {
+          "sent": "busy",
+          "bubble": "코드 꼼꼼히 작성 중! ✨"
+        },
+        {
+          "sent": "talking",
+          "bubble": "결과 나왔다냥!"
+        },
+        {
+          "sent": "error",
+          "bubble": "빨간 불 떴다냥!"
+        }
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+      ],
+      "blockedExternalRequests": [
+        "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"
+      ],
+      "screenshot": "docs/autonomous_run/screens/after_pixel_cat.png"
+    },
+    {
+      "character": "mao",
+      "PIXI": "object",
+      "PIXI_live2d": "undefined",
+      "Live2DCubismCore": "undefined",
+      "imageVisible": true,
+      "canvasVisible": false,
+      "charName": "냥이 (2D Cat)",
+      "bubbleHistory": [
+        "⚠️ Mao (Live2D 4K)을(를) 띄울 수 없어 냥이 (2D Cat)(으)로 대신 나왔어요 (Live2D Cubism Core를 불러오지 못했습니다 (오프라인?))",
+        "(화면 집중 중)",
+        "열심히 코딩 중이에요! 🪄",
+        "야옹! 완료했다냥! ✨",
+        "하악! 에러가 났다냥! 🙀"
+      ],
+      "interactions": {
+        "contextMenuOpens": true,
+        "scaleSliderTo150": {
+          "stored": "1.5",
+          "label": "150%"
+        },
+        "dragCallsUnlocked": 1,
+        "lockedStored": "true",
+        "dragCallsLocked": 0,
+        "unlockedViaTrayStored": "false",
+        "sfx": {
+          "enabled": true,
+          "played": [
+            [
+              "talking",
+              true
+            ]
+          ],
+          "audioContextAvailable": true
+        },
+        "invokedCommands": [
+          "get_character_configs",
+          "set_always_on_top",
+          "sync_tray_state"
+        ]
+      },
+      "stateLog": [
+        {
+          "sent": "thinking",
+          "bubble": "(화면 집중 중)"
+        },
+        {
+          "sent": "busy",
+          "bubble": "열심히 코딩 중이에요! 🪄"
+        },
+        {
+          "sent": "talking",
+          "bubble": "야옹! 완료했다냥! ✨"
+        },
+        {
+          "sent": "error",
+          "bubble": "하악! 에러가 났다냥! 🙀"
+        }
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+      ],
+      "blockedExternalRequests": [
+        "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"
+      ],
+      "screenshot": "docs/autonomous_run/screens/after_mao.png"
+    },
+    {
+      "character": "wanko",
+      "PIXI": "object",
+      "PIXI_live2d": "undefined",
+      "Live2DCubismCore": "undefined",
+      "imageVisible": true,
+      "canvasVisible": false,
+      "charName": "냥이 (2D Cat)",
+      "bubbleHistory": [
+        "⚠️ 완코 (Live2D Dog)을(를) 띄울 수 없어 냥이 (2D Cat)(으)로 대신 나왔어요 (Live2D Cubism Core를 불러오지 못했습니다 (오프라인?))",
+        "계산 중이다냥...",
+        "파일 작성 및 수정 중...",
+        "결과 나왔다냥!",
+        "하악! 에러가 났다냥! 🙀"
+      ],
+      "interactions": {
+        "contextMenuOpens": true,
+        "scaleSliderTo150": {
+          "stored": "1.5",
+          "label": "150%"
+        },
+        "dragCallsUnlocked": 1,
+        "lockedStored": "true",
+        "dragCallsLocked": 0,
+        "unlockedViaTrayStored": "false",
+        "sfx": {
+          "enabled": true,
+          "played": [
+            [
+              "talking",
+              true
+            ]
+          ],
+          "audioContextAvailable": true
+        },
+        "invokedCommands": [
+          "get_character_configs",
+          "set_always_on_top",
+          "sync_tray_state"
+        ]
+      },
+      "stateLog": [
+        {
+          "sent": "thinking",
+          "bubble": "계산 중이다냥..."
+        },
+        {
+          "sent": "busy",
+          "bubble": "파일 작성 및 수정 중..."
+        },
+        {
+          "sent": "talking",
+          "bubble": "결과 나왔다냥!"
+        },
+        {
+          "sent": "error",
+          "bubble": "하악! 에러가 났다냥! 🙀"
+        }
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+      ],
+      "blockedExternalRequests": [
+        "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"
+      ],
+      "screenshot": "docs/autonomous_run/screens/after_wanko.png"
+    }
+  ]
+}

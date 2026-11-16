@@ -260,6 +260,33 @@ canvas#live2d-canvas {
   font-size: 13px;
 }
 
+/* 크기 / 볼륨 미세 조절 슬라이더 */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: #9aa8ff;
+  cursor: pointer;
+}
+
+.slider-row.disabled {
+  opacity: 0.35;
+}
+
+.slider-value {
+  width: 38px;
+  text-align: right;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+
 .hidden {
   display: none !important;
 }

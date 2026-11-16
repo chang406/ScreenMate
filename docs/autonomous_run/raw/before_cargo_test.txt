@@ -1,0 +1,208 @@
+
+running 15 tests
+test session_watcher::tests::bench_find_latest_session_file ... ignored
+test session_watcher::tests::antigravity_fixture_sequence ... ok
+test session_watcher::tests::claude_plain_user_prompt_is_thinking ... ok
+test session_watcher::tests::claude_fixture_sequence ... ok
+test session_watcher::tests::claude_api_error_message_is_error ... FAILED
+test session_watcher::tests::claude_meta_records_are_ignored ... FAILED
+test session_watcher::tests::claude_tool_result_inside_user_record_is_busy ... FAILED
+test session_watcher::tests::codex_legacy_fixture_sequence ... ok
+test session_watcher::tests::claude_realistic_fixture_sequence ... FAILED
+test session_watcher::tests::codex_rollout_records ... FAILED
+test session_watcher::tests::codex_rollout_fixture_sequence ... FAILED
+test session_watcher::tests::tail_reads_appended_complete_lines ... ok
+test session_watcher::tests::tail_does_not_drop_partially_written_line ... FAILED
+test session_watcher::tests::tail_survives_split_multibyte_utf8 ... ok
+test session_watcher::tests::tail_resets_when_file_is_truncated ... ok
+
+failures:
+
+---- session_watcher::tests::claude_api_error_message_is_error stdout ----
+
+thread 'session_watcher::tests::claude_api_error_message_is_error' (12668) panicked at src/session_watcher_tests.rs:135:5:
+assertion `left == right` failed
+  left: Some((Talking, None))
+ right: Some((Error, None))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<core::option::Option<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>, core::option::Option<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>>
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:394:5
+   4: screen_mate_lib::session_watcher::tests::claude_api_error_message_is_error
+             at ./src/session_watcher_tests.rs:135:5
+   5: screen_mate_lib::session_watcher::tests::claude_api_error_message_is_error::{closure#0}
+             at ./src/session_watcher_tests.rs:127:39
+   6: <screen_mate_lib::session_watcher::tests::claude_api_error_message_is_error::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- session_watcher::tests::claude_meta_records_are_ignored stdout ----
+
+thread 'session_watcher::tests::claude_meta_records_are_ignored' (12670) panicked at src/session_watcher_tests.rs:145:9:
+assertion `left == right` failed: record should be ignored: {"isMeta":true,"message":{"content":"<command-name>/clear</command-name>","role":"user"},"type":"user"}
+  left: Some((Thinking, None))
+ right: None
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<core::option::Option<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>, core::option::Option<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>>
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:394:5
+   4: screen_mate_lib::session_watcher::tests::claude_meta_records_are_ignored
+             at ./src/session_watcher_tests.rs:145:9
+   5: screen_mate_lib::session_watcher::tests::claude_meta_records_are_ignored::{closure#0}
+             at ./src/session_watcher_tests.rs:139:37
+   6: <screen_mate_lib::session_watcher::tests::claude_meta_records_are_ignored::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- session_watcher::tests::claude_tool_result_inside_user_record_is_busy stdout ----
+
+thread 'session_watcher::tests::claude_tool_result_inside_user_record_is_busy' (12673) panicked at src/session_watcher_tests.rs:114:5:
+assertion `left == right` failed
+  left: Some((Thinking, None))
+ right: Some((Busy, Some("general")))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<core::option::Option<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>, core::option::Option<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>>
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:394:5
+   4: screen_mate_lib::session_watcher::tests::claude_tool_result_inside_user_record_is_busy
+             at ./src/session_watcher_tests.rs:114:5
+   5: screen_mate_lib::session_watcher::tests::claude_tool_result_inside_user_record_is_busy::{closure#0}
+             at ./src/session_watcher_tests.rs:106:51
+   6: <screen_mate_lib::session_watcher::tests::claude_tool_result_inside_user_record_is_busy::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- session_watcher::tests::claude_realistic_fixture_sequence stdout ----
+
+thread 'session_watcher::tests::claude_realistic_fixture_sequence' (12672) panicked at src/session_watcher_tests.rs:152:5:
+assertion `left == right` failed
+  left: [(Thinking, None), (Thinking, None), (Busy, Some("read")), (Thinking, None), (Busy, Some("edit")), (Thinking, None), (Busy, Some("command")), (Thinking, None), (Talking, None)]
+ right: [(Thinking, None), (Thinking, None), (Busy, Some("read")), (Busy, Some("general")), (Busy, Some("edit")), (Busy, Some("general")), (Busy, Some("command")), (Busy, Some("general")), (Talking, None)]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<alloc::vec::Vec<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>, alloc::vec::Vec<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>>
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:394:5
+   4: screen_mate_lib::session_watcher::tests::claude_realistic_fixture_sequence
+             at ./src/session_watcher_tests.rs:152:5
+   5: screen_mate_lib::session_watcher::tests::claude_realistic_fixture_sequence::{closure#0}
+             at ./src/session_watcher_tests.rs:150:39
+   6: <screen_mate_lib::session_watcher::tests::claude_realistic_fixture_sequence::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- session_watcher::tests::codex_rollout_records stdout ----
+
+thread 'session_watcher::tests::codex_rollout_records' (12676) panicked at src/session_watcher_tests.rs:202:9:
+assertion `left == right` failed: record: {"payload":{"content":[{"text":"테스트 고쳐줘","type":"input_text"}],"role":"user","type":"message"},"type":"response_item"}
+  left: None
+ right: Some((Thinking, None))
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<core::option::Option<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>, core::option::Option<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>>
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:394:5
+   4: screen_mate_lib::session_watcher::tests::codex_rollout_records
+             at ./src/session_watcher_tests.rs:202:9
+   5: screen_mate_lib::session_watcher::tests::codex_rollout_records::{closure#0}
+             at ./src/session_watcher_tests.rs:173:27
+   6: <screen_mate_lib::session_watcher::tests::codex_rollout_records::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- session_watcher::tests::codex_rollout_fixture_sequence stdout ----
+
+thread 'session_watcher::tests::codex_rollout_fixture_sequence' (12675) panicked at src/session_watcher_tests.rs:209:5:
+assertion `left == right` failed
+  left: []
+ right: [(Thinking, None), (Thinking, None), (Busy, Some("command")), (Busy, Some("general")), (Busy, Some("edit")), (Busy, Some("general")), (Talking, None)]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<alloc::vec::Vec<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>, alloc::vec::Vec<(screen_mate_lib::session_watcher::AgentState, core::option::Option<alloc::string::String>)>>
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:394:5
+   4: screen_mate_lib::session_watcher::tests::codex_rollout_fixture_sequence
+             at ./src/session_watcher_tests.rs:209:5
+   5: screen_mate_lib::session_watcher::tests::codex_rollout_fixture_sequence::{closure#0}
+             at ./src/session_watcher_tests.rs:207:36
+   6: <screen_mate_lib::session_watcher::tests::codex_rollout_fixture_sequence::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+---- session_watcher::tests::tail_does_not_drop_partially_written_line stdout ----
+
+thread 'session_watcher::tests::tail_does_not_drop_partially_written_line' (12677) panicked at src/session_watcher_tests.rs:266:5:
+assertion `left == right` failed
+  left: []
+ right: [Object {"message": String("hi"), "type": String("user")}]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:439:17
+   3: core::panicking::assert_failed::<alloc::vec::Vec<serde_json::value::Value>, alloc::vec::Vec<serde_json::value::Value>>
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:394:5
+   4: screen_mate_lib::session_watcher::tests::tail_does_not_drop_partially_written_line
+             at ./src/session_watcher_tests.rs:266:5
+   5: screen_mate_lib::session_watcher::tests::tail_does_not_drop_partially_written_line::{closure#0}
+             at ./src/session_watcher_tests.rs:254:47
+   6: <screen_mate_lib::session_watcher::tests::tail_does_not_drop_partially_written_line::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    session_watcher::tests::claude_api_error_message_is_error
+    session_watcher::tests::claude_meta_records_are_ignored
+    session_watcher::tests::claude_realistic_fixture_sequence
+    session_watcher::tests::claude_tool_result_inside_user_record_is_busy
+    session_watcher::tests::codex_rollout_fixture_sequence
+    session_watcher::tests::codex_rollout_records
+    session_watcher::tests::tail_does_not_drop_partially_written_line
+
+test result: FAILED. 7 passed; 7 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+error: test failed, to rerun pass `--lib`

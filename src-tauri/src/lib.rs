@@ -1,9 +1,11 @@
 mod cursor_watcher;
+mod desktop;
 mod session_watcher;
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::Duration;
 use base64::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -22,10 +24,16 @@ fn set_always_on_top(window: tauri::Window, always_on_top: bool) -> Result<(), S
     window.set_always_on_top(always_on_top).map_err(|e| e.to_string())
 }
 
+/// Saves pending state (window position) and exits the application.
+pub(crate) fn shutdown(app: &AppHandle) {
+    desktop::flush_position();
+    app.exit(0);
+}
+
 /// Gracefully exits the application.
 #[tauri::command]
 fn exit_app(app: AppHandle) {
-    app.exit(0);
+    shutdown(&app);
 }
 
 /// Finds the `src` directory containing `characters.json`.
@@ -120,6 +128,21 @@ fn save_app_config(src_dir: &Path, config: &Value) -> Result<(), String> {
     fs::write(&path, pretty).map_err(|e| e.to_string())
 }
 
+/// Serializes read-modify-write cycles on `app_config.json`. Several writers exist (settings
+/// window commands, the debounced window-position saver), and without this lock two
+/// concurrent updates could each load the old file and one change would be lost.
+static APP_CONFIG_LOCK: Mutex<()> = Mutex::new(());
+
+/// Loads `app_config.json`, applies `mutate`, and saves it back atomically w.r.t. other updaters.
+pub(crate) fn update_app_config<F: FnOnce(&mut Value)>(mutate: F) -> Result<Value, String> {
+    let _guard = APP_CONFIG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let src_dir = get_src_dir()?;
+    let mut config = load_app_config(&src_dir);
+    mutate(&mut config);
+    save_app_config(&src_dir, &config)?;
+    Ok(config)
+}
+
 /// Finds the `character.json` file for a given character ID.
 /// Checks custom_characters first, then standard characters.
 fn find_character_json_path(src_dir: &Path, char_id: &str) -> Option<PathBuf> {
@@ -208,9 +231,14 @@ fn get_character_configs() -> Result<Value, String> {
         } else if let Some((first_key, _)) = characters.iter().next() {
             active = first_key.clone();
         }
+        let fixed = active.clone();
+        let _ = update_app_config(|cfg| {
+            if let Some(obj) = cfg.as_object_mut() {
+                obj.insert("activeCharacter".to_string(), Value::String(fixed));
+            }
+        });
         if let Some(obj) = app_config.as_object_mut() {
             obj.insert("activeCharacter".to_string(), Value::String(active.clone()));
-            let _ = save_app_config(&src_dir, &app_config);
         }
     }
 
@@ -242,14 +270,11 @@ fn get_character_configs() -> Result<Value, String> {
 /// Sets the active character and notifies the main window.
 #[tauri::command]
 fn set_active_character(app: AppHandle, id: String) -> Result<(), String> {
-    let src_dir = get_src_dir()?;
-    let mut app_config = load_app_config(&src_dir);
-
-    if let Some(obj) = app_config.as_object_mut() {
-        obj.insert("activeCharacter".to_string(), Value::String(id.clone()));
-    }
-
-    save_app_config(&src_dir, &app_config)?;
+    update_app_config(|cfg| {
+        if let Some(obj) = cfg.as_object_mut() {
+            obj.insert("activeCharacter".to_string(), Value::String(id.clone()));
+        }
+    })?;
 
     // Notify main overlay window
     let _ = app.emit("switch-character", &id);
@@ -947,19 +972,17 @@ fn delete_custom_character(app: AppHandle, id: String) -> Result<(), String> {
         let _ = fs::remove_dir_all(&custom_char_dir);
     }
 
-    let mut app_config = load_app_config(&src_dir);
     let mut need_switch = false;
-    if let Some(active) = app_config.get("activeCharacter").and_then(|a| a.as_str()) {
-        if active == id {
+    let _ = update_app_config(|cfg| {
+        if cfg.get("activeCharacter").and_then(|a| a.as_str()) == Some(id.as_str()) {
             need_switch = true;
+            if let Some(obj) = cfg.as_object_mut() {
+                obj.insert("activeCharacter".to_string(), Value::String("mao".to_string()));
+            }
         }
-    }
+    });
 
     if need_switch {
-        if let Some(obj) = app_config.as_object_mut() {
-            obj.insert("activeCharacter".to_string(), Value::String("mao".to_string()));
-        }
-        let _ = save_app_config(&src_dir, &app_config);
         let _ = app.emit("switch-character", "mao");
     }
 
@@ -982,11 +1005,11 @@ fn save_bubble_settings(app: AppHandle, payload: SaveBubbleSettingsPayload) -> R
 
     if let Some(target) = payload.target_id.as_deref() {
         if target == "global" {
-            let mut app_config = load_app_config(&src_dir);
-            if let Some(obj) = app_config.as_object_mut() {
-                obj.insert("globalBubbleSettings".to_string(), payload.settings);
-            }
-            save_app_config(&src_dir, &app_config)?;
+            update_app_config(|cfg| {
+                if let Some(obj) = cfg.as_object_mut() {
+                    obj.insert("globalBubbleSettings".to_string(), payload.settings);
+                }
+            })?;
         } else if let Some(char_json_path) = find_character_json_path(&src_dir, target) {
             let content = fs::read_to_string(&char_json_path).map_err(|e| e.to_string())?;
             let mut char_val: Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
@@ -999,11 +1022,11 @@ fn save_bubble_settings(app: AppHandle, payload: SaveBubbleSettingsPayload) -> R
             return Err(format!("캐릭터 '{}'의 설정 파일을 찾을 수 없습니다.", target));
         }
     } else {
-        let mut app_config = load_app_config(&src_dir);
-        if let Some(obj) = app_config.as_object_mut() {
-            obj.insert("globalBubbleSettings".to_string(), payload.settings);
-        }
-        save_app_config(&src_dir, &app_config)?;
+        update_app_config(|cfg| {
+            if let Some(obj) = cfg.as_object_mut() {
+                obj.insert("globalBubbleSettings".to_string(), payload.settings);
+            }
+        })?;
     }
 
     let _ = app.emit("bubble-settings-updated", ());
@@ -1059,8 +1082,7 @@ fn add_custom_watch_path(path: String) -> Result<(), String> {
     if trimmed.is_empty() {
         return Err("경로가 비어 있습니다.".into());
     }
-    let src_dir = get_src_dir()?;
-    let mut config = load_app_config(&src_dir);
+    update_app_config(|config| {
     if let Some(obj) = config.as_object_mut() {
         let entry = obj
             .entry("customWatchPaths".to_string())
@@ -1072,21 +1094,20 @@ fn add_custom_watch_path(path: String) -> Result<(), String> {
             }
         }
     }
-    save_app_config(&src_dir, &config)?;
+    })?;
     Ok(())
 }
 
 /// Removes a directory path from customWatchPaths in app_config.json.
 #[tauri::command]
 fn remove_custom_watch_path(path: String) -> Result<(), String> {
-    let src_dir = get_src_dir()?;
-    let mut config = load_app_config(&src_dir);
-    if let Some(obj) = config.as_object_mut() {
-        if let Some(arr) = obj.get_mut("customWatchPaths").and_then(Value::as_array_mut) {
-            arr.retain(|v| v.as_str() != Some(&path));
+    update_app_config(|config| {
+        if let Some(obj) = config.as_object_mut() {
+            if let Some(arr) = obj.get_mut("customWatchPaths").and_then(Value::as_array_mut) {
+                arr.retain(|v| v.as_str() != Some(&path));
+            }
         }
-    }
-    save_app_config(&src_dir, &config)?;
+    })?;
     Ok(())
 }
 
@@ -1153,15 +1174,19 @@ pub fn run() {
             get_custom_watch_paths,
             add_custom_watch_path,
             remove_custom_watch_path,
-            replay_fixture_session
+            replay_fixture_session,
+            desktop::hide_to_tray,
+            desktop::sync_tray_state
         ])
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "settings" {
-                    api.prevent_close();
-                    let _ = window.hide();
-                }
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } if window.label() == "settings" => {
+                api.prevent_close();
+                let _ = window.hide();
             }
+            tauri::WindowEvent::Moved(pos) if window.label() == "main" => {
+                desktop::note_main_moved(pos.x, pos.y);
+            }
+            _ => {}
         })
         .setup(|app| {
             // Set window icon explicitly for taskbar and window headers
@@ -1172,6 +1197,24 @@ pub fn run() {
             if let Some(settings_win) = app.get_webview_window("settings") {
                 let _ = settings_win.set_icon(icon);
             }
+
+            // System tray (the overlay is hidden from the taskbar). If the tray cannot be created
+            // on this platform, fall back to a taskbar entry so the app is never unreachable.
+            if let Err(e) = desktop::setup_tray(app.handle()) {
+                eprintln!("[desktop] tray unavailable ({e}); showing taskbar entry instead");
+                if let Some(main_win) = app.get_webview_window("main") {
+                    let _ = main_win.set_skip_taskbar(false);
+                }
+            }
+
+            // Restore last window position (main starts hidden to avoid a visible jump), then show.
+            if let Some(main_win) = app.get_webview_window("main") {
+                if let Ok(src_dir) = get_src_dir() {
+                    desktop::restore_main_position(&main_win, &load_app_config(&src_dir));
+                }
+                let _ = main_win.show();
+            }
+            tauri::async_runtime::spawn(desktop::run_position_saver());
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

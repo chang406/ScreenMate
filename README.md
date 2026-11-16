@@ -43,7 +43,8 @@
 - **멀티 볼륨 커스텀 감시 경로**: D:, E: 드라이브 등 사용자 정의 로그 경로 동적 등록 지원 (`src/app_config.json` 연동)
 - **모의 시뮬레이터 (Fixture Replay)**: 해당 AI 도구가 설치되지 않은 환경에서도 가상 세션을 1초 만에 재생하여 7대 캐릭터 반응 즉시 테스트
 - **화면 프라이버시 안심 마스킹**: 화면 공유/방송 시 사용자 로컬 계정명(`C:\Users\<username>`)을 `~`로 자동 마스킹 보호 (마우스 호버 시 전체 경로 툴팁)
-- **작동 원리**: 로컬 대화 로그(`transcript.jsonl`, `~/.claude/projects/` 등)를 150ms 초고속 tail 감시하여 가장 최근에 활성화된 세션에 자동 반응.
+- **작동 원리**: 로컬 대화 로그(`transcript.jsonl`, `~/.claude/projects/` 등)를 150ms 초고속 tail 감시하여 가장 최근에 활성화된 세션에 자동 반응. 새 세션 탐색은 1초에 한 번만 디스크를 순회하여 상주 부하를 최소화하고, 기록 중인 줄을 끝까지 기다렸다 읽어 이벤트 유실이 없습니다.
+- **실제 로그 포맷 대응**: Claude Code의 도구 결과(`tool_result`)·API 에러·인터럽트, OpenAI Codex CLI의 rollout 포맷(`~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`)을 정확히 분류 (단위 테스트로 검증, `cd src-tauri && cargo test`)
 - **7가지 세부 상태(State) 지원**:
   1. `idle` (대기): 편안한 호흡 모션 및 잔잔한 대기 대사
   2. `thinking` (생각 중): 갸웃거리며 생각하는 집중 모션 (*"어디 보자... 생각 중!"*)
@@ -58,15 +59,21 @@
 - **완코 (Live2D Dog)**: Live2D Cubism 3/4 정식 런타임 (귀여운 강아지 모션 12종 및 상황별 리액션 완비)
 - **냥이 (2D Cat)**: 상황별 6종 전용 SVG 일러스트 탑재
 - **스마트 폴백 (Smart Fallback)**: 모션이 부족한 Live2D나 이미지가 1~3장뿐인 단순 도트 캐릭터를 넣어도 에러 없이 자동으로 상태를 대체하여 안전하게 구동
+- **오프라인 우선 런타임**: Pixi.js / pixi-live2d-display를 `src/lib/vendor/`에 내장. Live2D Cubism Core는 `src/lib/`에 직접 두면 완전 오프라인 동작(없으면 공식 CDN). Live2D를 불러올 수 없으면 캐릭터가 사라지는 대신 **2D 냥이로 임시 대체**됩니다 → [`src/lib/README.md`](src/lib/README.md)
 
 ### 3. 방해 없는 미니멀 UI/UX & 캐릭터 매니저 설정 창
 - **완벽한 투명 마우스 클릭 관통 (Per-pixel Click-Through)**: 캐릭터 몸체만 클릭/드래그되고, 투명 배경은 뒤쪽 작업 창(VS Code, 브라우저 등)으로 100% 통과
 - **마우스 휠(Wheel) 크기 조절**: 캐릭터 위에서 휠을 굴려 60% ~ 200%로 자유롭게 확대/축소 (넉넉한 고정 윈도우 기반으로 메뉴 잘림 0%)
+- **시스템 트레이 상주**: 작업표시줄을 차지하지 않고 트레이에 상주. 트레이 좌클릭 = 보이기/숨기기, 우클릭 메뉴 = 캐릭터 매니저 / 항상 위 / 위치 잠금 / 종료
+- **창 위치 기억**: 마지막으로 둔 위치에서 다시 시작 (그 모니터가 분리되었으면 기본 위치로 안전 복귀)
 - **마우스 우클릭 미니멀 메뉴**:
-  - 🔍 크기 조절 프리셋 (60% / 100% / 150% / 200%)
+  - 🔍 크기 조절 프리셋 (60% / 100% / 150% / 200%) + 1% 단위 슬라이더
   - 📌 항상 위에 고정 (ON / OFF 토글 - OFF 시 다른 작업 창 뒤로 자연스럽게 내려감)
+  - 🔒 위치 잠금 (코딩 중 실수로 캐릭터를 끌어 옮기는 것 방지, 클릭 반응은 유지)
+  - 🔊 효과음 On/Off + 볼륨 (작업 완료 차임, 에러, 클릭 — 기본 OFF, 에셋 없이 즉석 합성)
   - 🎲 캐릭터 랜덤 전환
   - ⚙️ **캐릭터 매니저** (독립 팝업 창: 갤러리 전환, 2D 이미지 추가, 스마트 Live2D 임포터, 말풍선 커스텀)
+  - 🫥 트레이로 숨기기
   - ❌ 프로그램 안전 종료
 
 ---
@@ -101,9 +108,10 @@ cargo run
 | 동작 | 인터랙션 기능 |
 | :--- | :--- |
 | **마우스 좌클릭 (탭)** | 캐릭터 윙크/손인사 리액션 (`click_react`) |
-| **마우스 좌클릭 + 드래그** | 화면 원하는 위치로 캐릭터 창 이동 |
+| **마우스 좌클릭 + 드래그** | 화면 원하는 위치로 캐릭터 창 이동 (위치 잠금 ON 시 이동 안 함, 위치는 자동 저장) |
 | **마우스 휠 위/아래** | 캐릭터 크기 실시간 축소 / 확대 (60% ~ 200%) |
-| **마우스 우클릭** | 미니멀 설정 메뉴 (크기 프리셋, 항상위 고정, 랜덤 전환, **캐릭터 매니저**, 종료) |
+| **마우스 우클릭** | 미니멀 설정 메뉴 (크기 프리셋/슬라이더, 항상위 고정, 위치 잠금, 효과음, 랜덤 전환, **캐릭터 매니저**, 트레이로 숨기기, 종료) |
+| **트레이 아이콘 좌클릭** | 캐릭터 보이기 / 숨기기 |
 | **투명 영역 클릭** | 뒤쪽에 있는 작업 창(IDE, 브라우저)으로 100% 마우스 클릭 관통 |
 
 ---
@@ -203,13 +211,17 @@ ScreenMate/
 │   ├── tauri.conf.json            # 창 설정 (투명, 프레임리스, 항상위)
 │   └── src/
 │       ├── main.rs
-│       ├── lib.rs                 # 클릭 관통, 창 리사이즈, 항상위 제어 커맨드
+│       ├── lib.rs                 # 클릭 관통, 항상위 제어, 캐릭터/설정 커맨드
+│       ├── desktop.rs             # 시스템 트레이, 창 위치 저장/복원
 │       ├── cursor_watcher.rs      # 16ms OS 레벨 마우스 커서 감시
-│       └── session_watcher.rs     # Antigravity 및 Claude Code 세션 실시간 감시
+│       ├── session_watcher.rs     # Antigravity / Claude Code / Codex 세션 실시간 감시
+│       └── session_watcher_tests.rs # 로그 분류·테일링 단위 테스트 (cargo test)
 └── src/                           # 프론트엔드 (Webview)
     ├── index.html                 # 캔버스 / 이미지 / 말풍선 / 우클릭 메뉴
     ├── style.css                  # 다크 글래스모피즘 스타일 및 애니메이션
     ├── main.js                    # 렌더러, 휠 줌, 스마트 폴백, 인터랙션
+    ├── sfx.js                     # WebAudio 합성 효과음 (기본 OFF)
+    ├── lib/                       # 오프라인 런타임 (live2d-loader.js, vendor/ Pixi·pixi-live2d-display)
     ├── settings.html              # 캐릭터 매니저 GUI 설정 창
     ├── settings.css               # 설정 창 글래스모피즘 스타일
     ├── settings.js                # 갤러리/2D/스마트 Live2D/말풍선 커스텀 로직
@@ -220,6 +232,11 @@ ScreenMate/
         ├── wanko/                 # (Live2D 완코 강아지 모델 + character.json)
         ├── pixel_cat/             # (2D 냥이 SVG 6종 + character.json)
         └── custom_characters/     # (개인 로컬 전용 커스텀 캐릭터 - Git 제외)
+tests/
+├── fixtures/agents/               # 도구별 샘플/실제 형태 세션 로그 (단위 테스트·Fixture Replay)
+└── smoke/frontend_smoke.cjs       # 오프라인 헤드리스 스모크 테스트 (Playwright)
+.github/workflows/ci.yml           # CI: cargo check/clippy/test + 프론트 스모크
+docs/autonomous_run/               # AI 자율 개발 실험 기록 (BEFORE / PROCESS / AFTER)
 ```
 
 ---
@@ -227,5 +244,5 @@ ScreenMate/
 ## 📜 라이선스 및 에셋 안내 (Notice)
 
 - **Mao & Wanko Live2D Models**: 본 프로젝트에 포함된 Mao 및 Wanko 캐릭터 모델은 Live2D 사의 공식 샘플 모델이며, [Live2D Free Material License](https://www.live2d.com/) 규정에 따라 비상업적 연구/학습/개발 용도로 사용됩니다.
-- **Live2D Cubism Core SDK**: Live2D Inc.의 공식 Web SDK CDN을 통해 로드됩니다.
-- **PixiJS**: MIT License
+- **Live2D Cubism Core SDK**: Live2D Inc.의 독점 라이선스 파일로 레포에 포함하지 않습니다. 기본은 공식 CDN에서 로드되며, 사용자가 `src/lib/live2dcubismcore.min.js`에 직접 배치하면 오프라인으로 동작합니다.
+- **PixiJS / pixi-live2d-display**: MIT License (`src/lib/vendor/`에 원본과 LICENSE 동봉)

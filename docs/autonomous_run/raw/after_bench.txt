@@ -1,0 +1,1 @@
+[bench] 2000 files: 1.839441ms per full scan; discovery walk every 1000ms => ~1.8 ms CPU/s spent scanning (old design: walk every 150ms => ~12.3 ms CPU/s)

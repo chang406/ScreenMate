@@ -1,0 +1,137 @@
+{
+  "label": "after_localcore",
+  "offline": true,
+  "results": [
+    {
+      "character": "mao",
+      "PIXI": "object",
+      "PIXI_live2d": "object",
+      "Live2DCubismCore": "object",
+      "imageVisible": true,
+      "canvasVisible": false,
+      "charName": "냥이 (2D Cat)",
+      "bubbleHistory": [
+        "⚠️ Mao (Live2D 4K)을(를) 띄울 수 없어 냥이 (2D Cat)(으)로 대신 나왔어요 (모델 로드 실패: Unknown error · 현재 Cubism Core가 지원하는 moc3 버전 ≤ 4, 최신 Core가 필요할 수 있어요)",
+        "계산 중이다냥...",
+        "코드 꼼꼼히 작성 중! ✨",
+        "결과 나왔다냥!",
+        "빨간 불 떴다냥!"
+      ],
+      "interactions": {
+        "contextMenuOpens": true,
+        "scaleSliderTo150": {
+          "stored": "1.5",
+          "label": "150%"
+        },
+        "dragCallsUnlocked": 1,
+        "lockedStored": "true",
+        "dragCallsLocked": 0,
+        "unlockedViaTrayStored": "false",
+        "sfx": {
+          "enabled": true,
+          "played": [
+            [
+              "talking",
+              true
+            ]
+          ],
+          "audioContextAvailable": true
+        },
+        "invokedCommands": [
+          "get_character_configs",
+          "set_always_on_top",
+          "sync_tray_state"
+        ]
+      },
+      "stateLog": [
+        {
+          "sent": "thinking",
+          "bubble": "계산 중이다냥..."
+        },
+        {
+          "sent": "busy",
+          "bubble": "코드 꼼꼼히 작성 중! ✨"
+        },
+        {
+          "sent": "talking",
+          "bubble": "결과 나왔다냥!"
+        },
+        {
+          "sent": "error",
+          "bubble": "빨간 불 떴다냥!"
+        }
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        "Live2D load failed: Error: Unknown error\n    at F.create (http://127.0.0.1:41691/lib/vendor/pixi-live2d-display.cubism4.min.js:1:19901)\n    at Object.createCoreModel (http://127.0.0.1:41691/lib/vendor/pixi-live2d-display.cubism4.min.js:1:114958)\n    at http://127.0.0.1:41691/lib/vendor/pixi-live2d-display.cubism4.min.js:1:96324\n    at Generator.next (<anonymous>)\n    at a (http://127.0.0.1:41691/lib/vendor/pixi-live2d-display.cubism4.min.js:1:76)"
+      ],
+      "blockedExternalRequests": [],
+      "screenshot": "docs/autonomous_run/screens/after_localcore_mao.png"
+    },
+    {
+      "character": "wanko",
+      "PIXI": "object",
+      "PIXI_live2d": "object",
+      "Live2DCubismCore": "object",
+      "imageVisible": false,
+      "canvasVisible": true,
+      "charName": "완코 (Live2D Dog)",
+      "bubbleHistory": [
+        "주인님, 무슨 일 있으신가요? 🐶",
+        "완코 (Live2D Dog) 준비 완료!",
+        "어디 보자... 🐾",
+        "열심히 코딩 중이에요! 🪄",
+        "성공적으로 완료했어요! 🦴✨",
+        "어라? 문제가 생겼다멍! 🐶💔"
+      ],
+      "interactions": {
+        "contextMenuOpens": true,
+        "scaleSliderTo150": {
+          "stored": "1.5",
+          "label": "150%"
+        },
+        "dragCallsUnlocked": 1,
+        "lockedStored": "true",
+        "dragCallsLocked": 0,
+        "unlockedViaTrayStored": "false",
+        "sfx": {
+          "enabled": true,
+          "played": [
+            [
+              "talking",
+              true
+            ]
+          ],
+          "audioContextAvailable": true
+        },
+        "invokedCommands": [
+          "get_character_configs",
+          "set_always_on_top",
+          "sync_tray_state"
+        ]
+      },
+      "stateLog": [
+        {
+          "sent": "thinking",
+          "bubble": "어디 보자... 🐾"
+        },
+        {
+          "sent": "busy",
+          "bubble": "열심히 코딩 중이에요! 🪄"
+        },
+        {
+          "sent": "talking",
+          "bubble": "성공적으로 완료했어요! 🦴✨"
+        },
+        {
+          "sent": "error",
+          "bubble": "어라? 문제가 생겼다멍! 🐶💔"
+        }
+      ],
+      "pageErrors": [],
+      "consoleErrors": [],
+      "blockedExternalRequests": [],
+      "screenshot": "docs/autonomous_run/screens/after_localcore_wanko.png"
+    }
+  ]
+}

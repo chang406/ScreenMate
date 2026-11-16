@@ -17,6 +17,18 @@ const menuSwitchCharBtn = document.getElementById("menu-switch-char-btn");
 const menuSettingsBtn = document.getElementById("menu-settings-btn");
 const menuExitBtn = document.getElementById("menu-exit-btn");
 const scaleBtns = document.querySelectorAll(".scale-btn");
+const scaleSlider = document.getElementById("scale-slider");
+const scaleValueEl = document.getElementById("scale-value");
+const toggleLockBtn = document.getElementById("toggle-lock-btn");
+const lockIconEl = document.getElementById("lock-icon");
+const lockStatusText = document.getElementById("lock-status-text");
+const toggleSfxBtn = document.getElementById("toggle-sfx-btn");
+const sfxIconEl = document.getElementById("sfx-icon");
+const sfxStatusText = document.getElementById("sfx-status-text");
+const sfxVolumeRow = document.getElementById("sfx-volume-row");
+const sfxVolumeSlider = document.getElementById("sfx-volume");
+const sfxVolumeValueEl = document.getElementById("sfx-volume-value");
+const menuHideBtn = document.getElementById("menu-hide-btn");
 const characterContainer = document.getElementById("character-container");
 
 let config = null;
@@ -43,6 +55,9 @@ let lastBusyMotionTime = 0;
 
 let currentScale = parseFloat(localStorage.getItem("screenmate_scale") || "1.0");
 let isAlwaysOnTop = localStorage.getItem("screenmate_always_on_top") !== "false";
+// 위치 잠금: 코딩 중 실수로 캐릭터를 끌어 옮기는 것을 방지 (클릭 반응은 유지)
+let isPositionLocked = localStorage.getItem("screenmate_position_locked") === "true";
+let lastLockHintTime = 0;
 
 // 말풍선 설정 계산 및 스타일 적용
 function getActiveBubbleSettings() {
@@ -360,6 +375,11 @@ function renderState(state, force = false, detail = null) {
   const charDef = config?.characters[currentKey];
   if (!charDef) return;
 
+  // 효과음: 실제로 상태가 바뀔 때만 (클릭 반응은 매번), 기본 OFF
+  if (state !== prevState || state === "click_react") {
+    window.ScreenMateSfx?.forState(state);
+  }
+
   if (prevState === "sleeping" && state !== "sleeping") {
     // 수면 모드에서 벗어날 때 열려있던 상시 말풍선 닫기 처리
     if (bubbleTimer) {
@@ -521,6 +541,9 @@ async function setScale(scale, notify = true) {
 
   updateBubblePosition();
 
+  if (scaleSlider) scaleSlider.value = String(Math.round(currentScale * 100));
+  if (scaleValueEl) scaleValueEl.textContent = `${Math.round(currentScale * 100)}%`;
+
   scaleBtns.forEach((btn) => {
     const val = parseFloat(btn.dataset.scale);
     if (Math.abs(val - currentScale) < 0.05) {
@@ -546,6 +569,41 @@ async function toggleAlwaysOnTop() {
   } catch (e) {
     console.error("set_always_on_top failed:", e);
   }
+  syncTray();
+}
+
+function togglePositionLock() {
+  isPositionLocked = !isPositionLocked;
+  localStorage.setItem("screenmate_position_locked", isPositionLocked.toString());
+  updateLockUI();
+  showSubtitle(isPositionLocked ? "🔒 위치 잠금: 드래그로 옮겨지지 않아요" : "🔓 위치 잠금 해제", 2000);
+  syncTray();
+}
+
+function updateLockUI() {
+  if (!lockStatusText) return;
+  lockStatusText.textContent = isPositionLocked ? "위치 잠금: ON" : "위치 잠금: OFF";
+  lockIconEl.textContent = isPositionLocked ? "🔒" : "🔓";
+  toggleLockBtn.style.opacity = isPositionLocked ? "1" : "0.7";
+}
+
+function updateSfxUI() {
+  const sfx = window.ScreenMateSfx;
+  if (!sfx || !sfxStatusText) return;
+  const on = sfx.isEnabled();
+  const vol = Math.round(sfx.getVolume() * 100);
+  sfxStatusText.textContent = on ? "효과음: ON" : "효과음: OFF";
+  sfxIconEl.textContent = on ? "🔊" : "🔇";
+  toggleSfxBtn.style.opacity = on ? "1" : "0.7";
+  sfxVolumeSlider.value = String(vol);
+  sfxVolumeSlider.disabled = !on;
+  sfxVolumeRow.classList.toggle("disabled", !on);
+  sfxVolumeValueEl.textContent = `${vol}%`;
+}
+
+/** 트레이 메뉴 체크 표시를 오버레이의 실제 상태와 맞춘다 */
+function syncTray() {
+  invoke("sync_tray_state", { alwaysOnTop: isAlwaysOnTop, positionLocked: isPositionLocked }).catch(() => {});
 }
 
 function updateAlwaysOnTopUI() {
@@ -553,19 +611,50 @@ function updateAlwaysOnTopUI() {
   toggleTopBtn.style.opacity = isAlwaysOnTop ? "1" : "0.7";
 }
 
+/** Live2D 런타임(Cubism Core + Pixi + 플러그인) 로드 결과. lib/live2d-loader.js 참고 */
+async function getLive2DRuntime() {
+  if (window.__live2dReady) {
+    try {
+      return await window.__live2dReady;
+    } catch (e) {
+      return { ok: false, error: String(e?.message || e) };
+    }
+  }
+  const ok = typeof PIXI !== "undefined" && !!PIXI.live2d;
+  return { ok, error: ok ? null : "Live2D 런타임 없음" };
+}
+
+/** Live2D를 띄울 수 없을 때 대신 보여줄 2D 캐릭터 키 (냥이 우선) */
+function findImageFallbackKey() {
+  const chars = config?.characters || {};
+  if (chars.pixel_cat && chars.pixel_cat.type !== "live2d") return "pixel_cat";
+  return Object.keys(chars).find((k) => chars[k]?.type !== "live2d") || null;
+}
+
 async function loadLive2D(charDef) {
+  const runtime = await getLive2DRuntime();
+  if (!runtime.ok) {
+    console.warn("[ScreenMate] Live2D runtime unavailable:", runtime.error);
+    return { ok: false, reason: runtime.error || "Live2D 런타임 없음" };
+  }
+
   canvas.classList.remove("hidden");
   imgEl.classList.add("hidden");
 
   if (!pixiApp) {
-    pixiApp = new PIXI.Application({
-      view: canvas,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      backgroundAlpha: 0,
-      autoDensity: true,
-      resolution: window.devicePixelRatio || 1,
-    });
+    try {
+      pixiApp = new PIXI.Application({
+        view: canvas,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        backgroundAlpha: 0,
+        autoDensity: true,
+        resolution: window.devicePixelRatio || 1,
+      });
+    } catch (err) {
+      console.error("PIXI init failed:", err);
+      return { ok: false, reason: "그래픽 초기화 실패: " + (err?.message || err) };
+    }
   }
 
   if (currentLive2DModel) {
@@ -580,11 +669,16 @@ async function loadLive2D(charDef) {
     currentLive2DModel = model;
     fitModelToCanvas();
     renderState(currentState, true);
-    return true;
+    return { ok: true };
   } catch (err) {
     console.error("Live2D load failed:", err);
-    showSubtitle("⚠️ Live2D 로드 실패: " + (err?.message || err), 4000);
-    return false;
+    let hint = "";
+    try {
+      // 모델(moc3)이 Cubism Core보다 최신이면 'Unknown error'만 나오므로 지원 버전을 함께 안내
+      const latest = window.Live2DCubismCore?.Version?.csmGetLatestMocVersion?.();
+      if (latest !== undefined) hint = ` · 현재 Cubism Core가 지원하는 moc3 버전 ≤ ${latest}, 최신 Core가 필요할 수 있어요`;
+    } catch (_) {}
+    return { ok: false, reason: "모델 로드 실패: " + (err?.message || err) + hint };
   }
 }
 
@@ -608,16 +702,29 @@ async function switchCharacter(key) {
   const charDef = config.characters[key];
   charNameEl.textContent = charDef.name || key;
 
-  let success = true;
   if (charDef.type === "live2d") {
-    success = await loadLive2D(charDef);
+    const result = await loadLive2D(charDef);
+    if (!result.ok) {
+      // 캐릭터가 통째로 사라지지 않도록 2D 캐릭터로 임시 대체 (설정은 바꾸지 않음 → 다음 실행 때 다시 시도)
+      const fallbackKey = findImageFallbackKey();
+      if (fallbackKey && fallbackKey !== key) {
+        currentKey = fallbackKey;
+        const fb = config.characters[fallbackKey];
+        charNameEl.textContent = fb.name || fallbackKey;
+        load2DImage(fb);
+        applyBubbleStyles();
+        showSubtitle(`⚠️ ${charDef.name || key}을(를) 띄울 수 없어 ${fb.name || fallbackKey}(으)로 대신 나왔어요 (${result.reason})`, 6000);
+      } else {
+        applyBubbleStyles();
+        showSubtitle("⚠️ Live2D 로드 실패: " + result.reason, 6000);
+      }
+      return;
+    }
   } else {
     load2DImage(charDef);
   }
   applyBubbleStyles();
-  if (success) {
-    showSubtitle(charDef.name + " 준비 완료!", 2500);
-  }
+  showSubtitle(charDef.name + " 준비 완료!", 2500);
 }
 
 async function switchRandomCharacter() {
@@ -749,6 +856,14 @@ document.addEventListener("mousemove", (event) => {
     if (dx > 6 || dy > 6) {
       isDragging = true;
       isMouseDown = false;
+      if (isPositionLocked) {
+        // 잠금 중에는 창을 옮기지 않고, 가끔만 안내 (말풍선 도배 방지)
+        if (Date.now() - lastLockHintTime > 4000) {
+          lastLockHintTime = Date.now();
+          showSubtitle("🔒 위치가 잠겨 있어요 (우클릭 메뉴에서 해제)", 2000);
+        }
+        return;
+      }
       appWindow.startDragging().catch((err) => {
         console.error("startDragging failed:", err);
       });
@@ -827,6 +942,44 @@ toggleTopBtn.addEventListener("click", (e) => {
   toggleAlwaysOnTop();
 });
 
+if (scaleSlider) {
+  scaleSlider.addEventListener("input", () => {
+    setScale(parseInt(scaleSlider.value, 10) / 100, false);
+  });
+  scaleSlider.addEventListener("change", () => {
+    showSubtitle(`크기: ${Math.round(currentScale * 100)}%`, 1500);
+  });
+}
+
+toggleLockBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  togglePositionLock();
+});
+
+toggleSfxBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const sfx = window.ScreenMateSfx;
+  if (!sfx) return;
+  sfx.setEnabled(!sfx.isEnabled());
+  updateSfxUI();
+  if (sfx.isEnabled()) sfx.play("complete", { force: true }); // 미리 듣기
+});
+
+sfxVolumeSlider?.addEventListener("input", () => {
+  window.ScreenMateSfx?.setVolume(parseInt(sfxVolumeSlider.value, 10) / 100);
+  updateSfxUI();
+});
+
+sfxVolumeSlider?.addEventListener("change", () => {
+  window.ScreenMateSfx?.play("click", { force: true });
+});
+
+menuHideBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  contextMenu.classList.add("hidden");
+  invoke("hide_to_tray").catch((err) => console.error("hide_to_tray failed:", err));
+});
+
 menuSwitchCharBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   contextMenu.classList.add("hidden");
@@ -855,6 +1008,11 @@ window.addEventListener("resize", () => {
     fitModelToCanvas();
     updateBubblePosition();
   }
+});
+
+listen("tray-action", (event) => {
+  if (event.payload === "toggle_always_on_top") toggleAlwaysOnTop();
+  else if (event.payload === "toggle_position_lock") togglePositionLock();
 });
 
 listen("state-change", (event) => {
@@ -909,10 +1067,15 @@ async function init() {
     await switchCharacter(activeKey);
     setScale(currentScale, false);
     updateAlwaysOnTopUI();
+    updateLockUI();
+    updateSfxUI();
     applyBubbleStyles();
   } catch (e) {
     console.error("Init failed:", e);
   }
+  // 저장된 '항상 위' 설정을 실제 창에 반영 (기존에는 UI만 OFF로 보이고 창은 계속 위에 있었음)
+  invoke("set_always_on_top", { alwaysOnTop: isAlwaysOnTop }).catch(() => {});
+  syncTray();
 }
 
 init();

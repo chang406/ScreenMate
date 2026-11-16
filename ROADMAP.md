@@ -18,25 +18,26 @@
 ## 🎯 v0.2.0: 데스크톱 필수 기본기 & 무결성 (Desktop Integrity)
 > **이번 스프린트 목표**: 매일 켜두고 써도 거슬림이 없는 완벽한 데스크톱 네이티브 경험 구축
 
-- [ ] 🔴 **[P0] 시스템 트레이(Tray) 상주 모드** `[Medium]`
+- [x] 🔴 **[P0] 시스템 트레이(Tray) 상주 모드** `[Medium]` ✅ *(자율 개발 실험에서 구현, 실기기 검증 대기 — [`docs/autonomous_run/`](docs/autonomous_run/README.md))*
   - 작업표시줄 숨김(`skipTaskbar: true`) 및 트레이 아이콘 상주
   - 트레이 우클릭 메뉴: 캐릭터 보이기/숨기기 토글, 설정 창, 항상 위 고정 토글, 앱 종료
-- [ ] 🔴 **[P0] 완전한 오프라인 정적 번들링 (Live2D/Pixi CDN 100% 제거)** `[Small]`
+- [x] 🔴 **[P0] 완전한 오프라인 정적 번들링 (Live2D/Pixi CDN 100% 제거)** `[Small]` ✅ *(부분: Pixi/플러그인 내장 + Core 로컬 우선 로더)*
   - Live2D Cubism Core 및 Pixi 라이브러리를 `src/lib/`에 로컬 포함하여 오프라인/폐쇄망 무결성 확보
+  - ℹ️ Cubism Core는 독점 라이선스라 레포에 커밋하지 않고 사용자가 `src/lib/`에 직접 배치 (없으면 CDN, 실패 시 2D 캐릭터로 대체)
 - [x] 🔴 **[P0] 멀티 환경 커스텀 감시 경로 & AI 연결 상태 모니터링** `[Medium]` ([`docs/PRD_CUSTOM_WATCH_PATHS.md`](docs/PRD_CUSTOM_WATCH_PATHS.md)) ✅ *(완료)*
   - D: 드라이브 이전 사용자 및 포터블 환경 지원 (`app_config.json`의 `customWatchPaths` 동적 감시)
   - 다중 에이전트 어댑터 구조 (`Antigravity`, `Claude Code`, `ChatGPT / Codex`)
   - 미설치 도구 모의 시뮬레이터(Fixture Replay) 및 화면 UI 프라이버시 안심 마스킹(`~`) 적용
   - 캐릭터 매니저 GUI 내 실시간 에이전트 연결 상태 뱃지 및 로그 폴더 추가/진단 UI
-- [ ] 🔴 **[P0] 창 위치 기억/복원 & 위치 고정(Lock)** `[Small]`
+- [x] 🔴 **[P0] 창 위치 기억/복원 & 위치 고정(Lock)** `[Small]` ✅
   - 앱 재시작 시 지난번 배치했던 모니터/좌표 자동 복원
   - 코딩 중 마우스 드래그 실수 방지를 위한 우클릭 메뉴의 **"위치 잠금(Lock Position)"** 기능
 - [ ] 🟡 **[P1] Windows 부팅 시 자동 시작 옵션** `[Small]`
   - 설정 창에서 'PC 시작 시 자동 실행' 토글 지원 (`tauri-plugin-autostart`)
-- [ ] 🟡 **[P1] 작업 알림 사운드(SFX) & 볼륨 제어** `[Medium]`
+- [x] 🟡 **[P1] 작업 알림 사운드(SFX) & 볼륨 제어** `[Medium]` ✅ *(WebAudio 합성, 우클릭 메뉴에서 On/Off·볼륨)*
   - 작업 완료(`talking`), 에러(`error`), 클릭(`click_react`) 시 귀엽고 짧은 효과음 재생
   - 설정 창에서 사운드 On/Off 및 볼륨 슬라이더 지원
-- [ ] 🟡 **[P1] 설정 창 미세 크기 조절 슬라이더 (60% ~ 200%)** `[Small]`
+- [x] 🟡 **[P1] 설정 창 미세 크기 조절 슬라이더 (60% ~ 200%)** `[Small]` ✅ *(우클릭 메뉴에 배치)*
   - 프리셋 버튼 외에 1% 단위 부드러운 스케일 슬라이더 제공
 - [ ] 🟢 **[P2] 2D 캐릭터 모션 강도 조절 & GIF 전용 모드** `[Small]`
   - 설정 창에서 2D 이미지의 CSS 모션 강도(끔 / 은은한 호흡 / 통통 튀기) 선택 옵션 제공
@@ -65,6 +66,7 @@
 
 - [ ] 🔴 **[P0] 단일 설치 인스톨러(NSIS Setup.exe) & 포터블(Portable .zip) 배포 파이프라인** `[Large]`
   - GitHub Actions 기반 멀티 아키텍처 자동 빌드/릴리즈
+  - ℹ️ 기반 마련: `.github/workflows/ci.yml` (check/clippy/test + 오프라인 스모크) 추가됨
 - [ ] 🟡 **[P1] Aider / Copilot CLI / Windsurf 등 기타 도구 감시 지원** `[Medium]`
 - [ ] 🟢 **[P2] 다국어 UI 지원 (i18n: 한국어, 영어)** `[Small]`
 

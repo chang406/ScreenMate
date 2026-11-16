@@ -36,6 +36,10 @@
             <button class="scale-btn" data-scale="1.5">150%</button>
             <button class="scale-btn" data-scale="2.0">200%</button>
           </div>
+          <div class="slider-row">
+            <input id="scale-slider" type="range" min="60" max="200" step="1" value="100" aria-label="캐릭터 크기" />
+            <span id="scale-value" class="slider-value">100%</span>
+          </div>
         </div>
 
         <div class="menu-divider"></div>
@@ -44,6 +48,22 @@
           <span class="menu-icon">📌</span>
           <span id="top-status-text">항상 위에 고정: ON</span>
         </button>
+
+        <button id="toggle-lock-btn" class="menu-item">
+          <span class="menu-icon" id="lock-icon">🔓</span>
+          <span id="lock-status-text">위치 잠금: OFF</span>
+        </button>
+
+        <div class="menu-section">
+          <button id="toggle-sfx-btn" class="menu-item">
+            <span class="menu-icon" id="sfx-icon">🔇</span>
+            <span id="sfx-status-text">효과음: OFF</span>
+          </button>
+          <div class="slider-row" id="sfx-volume-row">
+            <input id="sfx-volume" type="range" min="0" max="100" step="5" value="50" aria-label="효과음 볼륨" />
+            <span id="sfx-volume-value" class="slider-value">50%</span>
+          </div>
+        </div>
 
         <button id="menu-switch-char-btn" class="menu-item">
           <span class="menu-icon">🎲</span>
@@ -55,6 +75,11 @@
           <span>캐릭터 매니저 (추가/설정)</span>
         </button>
 
+        <button id="menu-hide-btn" class="menu-item">
+          <span class="menu-icon">🫥</span>
+          <span>트레이로 숨기기</span>
+        </button>
+
         <div class="menu-divider"></div>
 
         <button id="menu-exit-btn" class="menu-item danger">
@@ -64,11 +89,10 @@
       </div>
     </div>
 
-    <!-- Live2D 구동용 라이브러리 -->
-    <script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pixi.js@6.5.9/dist/browser/pixi.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
+    <!-- Live2D 구동용 라이브러리: 로컬(lib/) 우선, 실패 시 CDN 폴백. 결과는 window.__live2dReady -->
+    <script src="lib/live2d-loader.js"></script>
 
+    <script src="sfx.js"></script>
     <script type="module" src="main.js"></script>
   </body>
 </html>

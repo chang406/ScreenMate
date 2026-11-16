@@ -1,0 +1,1 @@
+[bench] 2000 files: 3.27629ms per full scan; at 150ms polling = 6.7 scans/s => ~21.8 ms CPU/s spent scanning

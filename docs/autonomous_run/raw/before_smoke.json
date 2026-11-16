@@ -1,0 +1,92 @@
+{
+  "label": "before",
+  "offline": true,
+  "results": [
+    {
+      "character": "pixel_cat",
+      "PIXI": "undefined",
+      "PIXI_live2d": "undefined",
+      "Live2DCubismCore": "undefined",
+      "imageVisible": true,
+      "canvasVisible": false,
+      "charName": "냥이 (2D Cat)",
+      "bubbleHistory": [
+        "계산 중이다냥...",
+        "코드 꼼꼼히 작성 중! ✨",
+        "야옹! 완료했다냥! ✨",
+        "하악! 에러가 났다냥! 🙀"
+      ],
+      "stateLog": [
+        {
+          "sent": "thinking",
+          "bubble": "계산 중이다냥..."
+        },
+        {
+          "sent": "busy",
+          "bubble": "코드 꼼꼼히 작성 중! ✨"
+        },
+        {
+          "sent": "talking",
+          "bubble": "야옹! 완료했다냥! ✨"
+        },
+        {
+          "sent": "error",
+          "bubble": "하악! 에러가 났다냥! 🙀"
+        }
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+      ],
+      "blockedExternalRequests": [
+        "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js",
+        "https://cdn.jsdelivr.net/npm/pixi.js@6.5.9/dist/browser/pixi.min.js",
+        "https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"
+      ],
+      "screenshot": "docs/autonomous_run/screens/before_pixel_cat.png"
+    },
+    {
+      "character": "mao",
+      "PIXI": "undefined",
+      "PIXI_live2d": "undefined",
+      "Live2DCubismCore": "undefined",
+      "imageVisible": false,
+      "canvasVisible": true,
+      "charName": "Mao (Live2D 4K)",
+      "bubbleHistory": [],
+      "stateLog": [
+        {
+          "sent": "thinking",
+          "bubble": "대기 중이에요"
+        },
+        {
+          "sent": "busy",
+          "bubble": "대기 중이에요"
+        },
+        {
+          "sent": "talking",
+          "bubble": "대기 중이에요"
+        },
+        {
+          "sent": "error",
+          "bubble": "대기 중이에요"
+        }
+      ],
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+        "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+        "Init failed: ReferenceError: PIXI is not defined\n    at loadLive2D (http://127.0.0.1:39427/main.js:561:5)\n    at switchCharacter (http://127.0.0.1:39427/main.js:613:21)\n    at init (http://127.0.0.1:39427/main.js:909:11)"
+      ],
+      "blockedExternalRequests": [
+        "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js",
+        "https://cdn.jsdelivr.net/npm/pixi.js@6.5.9/dist/browser/pixi.min.js",
+        "https://cdn.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"
+      ],
+      "screenshot": "docs/autonomous_run/screens/before_mao.png"
+    }
+  ]
+}

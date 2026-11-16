@@ -1,0 +1,38 @@
+warning: this `impl` can be derived
+  --> src/session_watcher.rs:53:1
+   |
+53 | / impl Default for AgentStatusInfo {
+54 | |     fn default() -> Self {
+55 | |         Self {
+56 | |             is_connected: false,
+...  |
+63 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#derivable_impls
+   = note: `#[warn(clippy::derivable_impls)]` on by default
+help: replace the manual implementation with a derive attribute
+   |
+45 + #[derive(Default)]
+46 | pub struct AgentStatusInfo {
+   |
+
+warning: you seem to be trying to use `&Box<T>`. Consider using just `&T`
+   --> src/session_watcher.rs:395:72
+    |
+395 |     pub fn match_adapter_for_path<'a>(&'a self, path: &Path) -> Option<&'a Box<dyn AgentLogAdapter>> {
+    |                                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `&'a dyn AgentLogAdapter`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#borrowed_box
+    = note: `#[warn(clippy::borrowed_box)]` on by default
+
+warning: manual implementation of `.is_multiple_of()`
+   --> src/session_watcher.rs:635:12
+    |
+635 |         if check_dirs_counter % 20 == 0 {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `check_dirs_counter.is_multiple_of(20)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_is_multiple_of
+    = note: `#[warn(clippy::manual_is_multiple_of)]` on by default
+
+warning: `screen-mate` (lib) generated 3 warnings (run `cargo clippy --fix --lib -p screen-mate -- ` to apply 2 suggestions)
