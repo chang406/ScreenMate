@@ -36,6 +36,67 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked
 
+  windows:
+    name: Windows (build · test · launch)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: cargo build --locked
+      - run: cargo test --locked
+
+      # 실제 .exe를 띄워 15초 동안 죽지 않는지 확인 (WebView2는 windows-latest에 기본 설치됨)
+      - name: Launch app and check it stays alive
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "target/debug/screen-mate.exe"
+          $p = Start-Process -FilePath $exe -WorkingDirectory (Get-Location) -PassThru `
+                 -RedirectStandardOutput app-stdout.log -RedirectStandardError app-stderr.log
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) {
+            Write-Host "--- stdout ---"; Get-Content app-stdout.log
+            Write-Host "--- stderr ---"; Get-Content app-stderr.log
+            throw "screen-mate.exe exited early with code $($p.ExitCode)"
+          }
+          Write-Host "screen-mate.exe is running (pid $($p.Id))"
+
+      # 화면 캡처는 CI 서버의 데스크톱 환경에 따라 검게 나올 수 있어 실패해도 빌드는 통과시킴
+      - name: Screenshot desktop (best effort)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("windows-desktop.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          Write-Host "Saved screenshot $($b.Width)x$($b.Height)"
+
+      - name: Stop app
+        if: always()
+        shell: pwsh
+        run: Get-Process screen-mate -ErrorAction SilentlyContinue | Stop-Process -Force
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-launch
+          path: |
+            src-tauri/app-stdout.log
+            src-tauri/app-stderr.log
+            src-tauri/windows-desktop.png
+          if-no-files-found: ignore
+
   frontend:
     name: Frontend (syntax · offline smoke)
     runs-on: ubuntu-24.04
