@@ -516,6 +516,68 @@ function stageSize() {
   return { w: canvas.clientWidth || window.innerWidth, h: canvas.clientHeight || window.innerHeight };
 }
 
+/**
+ * 캐릭터가 창 안에서 세로로 차지하는 범위(창 높이 대비 0~1)를 백엔드에 알린다.
+ * 백엔드(window_fit.rs)는 이 범위를 기준으로 "캐릭터가 화면 밖으로 나가지 않게"만 보정하므로,
+ * 캐릭터 위쪽의 투명한 빈 공간은 화면 위로 넘어가도 된다 → 캐릭터를 화면 맨 위까지 올릴 수 있음.
+ */
+function measureCharacterSpanPx() {
+  const charDef = config?.characters?.[currentKey];
+  if (charDef?.type === "live2d" && currentLive2DModel && pixiApp?.renderer?.gl) {
+    // 모델 경계 상자는 실제 그림보다 훨씬 클 수 있어(빈 캔버스 포함) 실제로 그려진 픽셀 행을 찾는다
+    try {
+      const renderer = pixiApp.renderer;
+      renderer.render(pixiApp.stage); // 같은 작업 안에서 바로 읽어야 버퍼가 유효함
+      const gl = renderer.gl;
+      const bw = gl.drawingBufferWidth;
+      const bh = gl.drawingBufferHeight;
+      const buf = new Uint8Array(bw * bh * 4);
+      gl.readPixels(0, 0, bw, bh, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      let topRow = -1;
+      let bottomRow = -1;
+      // WebGL 행 0 = 화면 맨 아래
+      for (let row = 0; row < bh; row++) {
+        const base = row * bw * 4;
+        let drawn = false;
+        for (let col = 0; col < bw; col += 2) {
+          if (buf[base + col * 4 + 3] > 40) { drawn = true; break; }
+        }
+        if (drawn) {
+          if (bottomRow === -1) bottomRow = row;
+          topRow = row;
+        }
+      }
+      if (topRow >= 0) {
+        const res = renderer.resolution || 1;
+        return { top: (bh - 1 - topRow) / res, bottom: (bh - bottomRow) / res };
+      }
+    } catch (e) {
+      console.warn("[ScreenMate] character span measure failed:", e);
+    }
+    const b = currentLive2DModel.getBounds();
+    return { top: b.y, bottom: b.y + b.height };
+  }
+  if (imgEl && !imgEl.classList.contains("hidden")) {
+    const r = imgEl.getBoundingClientRect();
+    if (r.height > 0) return { top: r.top, bottom: r.bottom };
+  }
+  return null;
+}
+
+let zoneReportTimer = null;
+function scheduleCharacterZoneReport(delay = 400) {
+  clearTimeout(zoneReportTimer);
+  zoneReportTimer = setTimeout(() => {
+    const span = measureCharacterSpanPx();
+    const h = window.innerHeight;
+    if (!span || !h) return;
+    // 모션(팔 올리기, 점프 등)으로 살짝 움직여도 잘리지 않도록 위아래 4% 여유
+    const top = Math.max(0, span.top / h - 0.04);
+    const bottom = Math.min(1, span.bottom / h + 0.02);
+    invoke("report_character_zone", { top, bottom }).catch(() => {});
+  }, delay);
+}
+
 function fitModelToCanvas() {
   if (!currentLive2DModel || !canvas) return;
   const model = currentLive2DModel;
@@ -555,6 +617,7 @@ async function setScale(scale, notify = true) {
   }
 
   updateBubblePosition();
+  scheduleCharacterZoneReport();
 
   if (scaleSlider) scaleSlider.value = String(Math.round(currentScale * 100));
   if (scaleValueEl) scaleValueEl.textContent = `${Math.round(currentScale * 100)}%`;
@@ -740,6 +803,8 @@ async function switchCharacter(key) {
   }
   applyBubbleStyles();
   showSubtitle(charDef.name + " 준비 완료!", 2500);
+  // Live2D는 로드 직후 첫 모션이 자리 잡을 때까지 조금 기다렸다가 측정
+  scheduleCharacterZoneReport(charDef.type === "live2d" ? 1200 : 400);
 }
 
 async function switchRandomCharacter() {

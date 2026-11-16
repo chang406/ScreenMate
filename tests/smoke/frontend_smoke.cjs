@@ -85,6 +85,7 @@ function mockTauriScript(configs) {
             window.__smoke.invokes.push(cmd);
             if (cmd === "get_character_configs") return JSON.parse(JSON.stringify(configs));
             if (cmd === "get_app_settings") return {};
+            if (cmd === "report_character_zone") window.__smoke.lastZone = args;
             return null;
           },
         },
@@ -164,6 +165,7 @@ async function runCharacter(browser, baseUrl, key) {
       canvasVisible: vis(cvs),
       charName: document.getElementById("char-name")?.textContent,
       devicePixelRatio: window.devicePixelRatio,
+      characterZone: window.__smoke.lastZone || null,
       canvasBuffer: (() => { const c = document.getElementById("live2d-canvas"); return c ? [c.width, c.height, c.clientWidth, c.clientHeight] : null; })(),
       bubbleHistory: window.__smoke.bubbles.filter((b, i, a) => b && a.indexOf(b) === i),
     };
