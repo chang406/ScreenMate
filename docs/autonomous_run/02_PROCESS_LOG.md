@@ -116,3 +116,5 @@
   - 해결 방법: claude.ai에서 GitHub 연결을 다시 하거나 저장소에 Claude GitHub App을 설치한 뒤 다시 푸시.
   - 대안: 세션에서 함께 전달한 `git bundle` 파일로 로컬에 그대로 가져올 수 있음 → `git fetch <bundle 파일> claude/agent-autonomous-development-w0d192:claude/agent-autonomous-development-w0d192`
 - main 브랜치, 원격 저장소, PR에는 **아무 변경도 하지 않음**.
+
+> **이후 경과 (2026-11-16 ~ 17 추가)**: 사용자가 GitHub 권한을 다시 연결해 푸시가 가능해졌고, 사용자 요청으로 Draft PR #1을 만들었습니다. 사용자의 Windows 테스트 피드백으로 PR #2~#5가 이어졌고, **다섯 PR 모두 main에 머지**되었습니다. 자세한 과정은 [`05_FOLLOWUP_HUMAN_LOOP.md`](./05_FOLLOWUP_HUMAN_LOOP.md).
