@@ -16,6 +16,26 @@
         "분석하고 있어요!"
       ]
     },
+    "busy": {
+      "src": "characters/custom_characters/my_char/thinking.svg",
+      "subtitles": [
+        "열심히 작업 중이에요! 🪄"
+      ],
+      "contextualSubtitles": {
+        "read": [
+          "파일 읽는 중이에요… 🔍"
+        ],
+        "edit": [
+          "코드 고치는 중이에요! ✍️"
+        ],
+        "command": [
+          "명령어 실행 중이에요! 💻"
+        ],
+        "browse": [
+          "웹 살펴보는 중이에요 🌐"
+        ]
+      }
+    },
     "talking": {
       "src": "characters/custom_characters/my_char/talking.svg",
       "subtitles": [
