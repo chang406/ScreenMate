@@ -32,7 +32,6 @@ const menuHideBtn = document.getElementById("menu-hide-btn");
 const hitIndicator = document.getElementById("hit-indicator");
 const toggleHitViewBtn = document.getElementById("toggle-hitview-btn");
 const hitViewStatusText = document.getElementById("hitview-status-text");
-const characterContainer = document.getElementById("character-container");
 
 let config = null;
 let currentKey = "mao";

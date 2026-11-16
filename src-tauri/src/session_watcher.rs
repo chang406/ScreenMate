@@ -70,7 +70,10 @@ fn get_status_lock() -> &'static Arc<Mutex<AgentStatusInfo>> {
 }
 
 pub fn get_agent_status_snapshot() -> AgentStatusInfo {
-    get_status_lock().lock().unwrap().clone()
+    get_status_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
 }
 
 pub fn update_agent_status<F>(updater: F)
