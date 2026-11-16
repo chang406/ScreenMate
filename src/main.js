@@ -901,6 +901,11 @@ listen("cursor-position", (event) => {
     setIgnoringCursor(true);
     return;
   }
+  // 앱이 직접 창을 옮기는 중에는 마우스를 놓을 때까지 클릭 관통을 끄고 이벤트를 계속 받는다
+  if (isWindowDragging) {
+    setIgnoringCursor(false);
+    return;
+  }
   const dpr = window.devicePixelRatio || 1;
   const onChar = isOverCharacter(x / dpr, y / dpr);
   setIgnoringCursor(!onChar);
@@ -947,6 +952,24 @@ let mouseDownX = 0;
 let mouseDownY = 0;
 let mouseDownTime = 0;
 let clickReactTimer = null;
+// 앱 주도 창 이동 중인지 (Windows 기본 창 이동은 창 꼭대기가 화면 위로 못 가게 막아서 직접 옮긴다)
+let isWindowDragging = false;
+
+function startWindowDrag() {
+  isWindowDragging = true;
+  invoke("begin_drag").catch((err) => {
+    // 구버전 백엔드 등 예외 시 기존 OS 드래그로 폴백
+    console.warn("begin_drag failed, falling back to OS drag:", err);
+    isWindowDragging = false;
+    appWindow.startDragging().catch(() => {});
+  });
+}
+
+function stopWindowDrag() {
+  if (!isWindowDragging) return;
+  isWindowDragging = false;
+  invoke("end_drag").catch(() => {});
+}
 
 function triggerClickReact() {
   renderState("click_react", true);
@@ -978,11 +1001,17 @@ document.addEventListener("mousedown", (event) => {
 });
 
 document.addEventListener("mousemove", (event) => {
+  // 창 밖에서 버튼을 놓아 mouseup을 놓친 경우 대비
+  if (isWindowDragging && (event.buttons & 1) === 0) {
+    stopWindowDrag();
+    isDragging = false;
+    return;
+  }
   if (isMouseDown && !isDragging) {
     const dx = Math.abs(event.screenX - mouseDownX);
     const dy = Math.abs(event.screenY - mouseDownY);
 
-    // 6px 이상 움직였을 때만 창 드래그 시작 (Windows DefWindowProc로 전환)
+    // 6px 이상 움직였을 때만 창 드래그 시작 (앱이 커서 이동량만큼 창을 직접 옮김)
     if (dx > 6 || dy > 6) {
       isDragging = true;
       isMouseDown = false;
@@ -994,15 +1023,18 @@ document.addEventListener("mousemove", (event) => {
         }
         return;
       }
-      appWindow.startDragging().catch((err) => {
-        console.error("startDragging failed:", err);
-      });
+      startWindowDrag();
     }
   }
 });
 
 // 클릭(탭) 인터랙션: 드래그하지 않고 제자리에서 뗐을 때 터치 반응 실행
 document.addEventListener("mouseup", (event) => {
+  if (event.button === 0 && isWindowDragging) {
+    stopWindowDrag();
+    isDragging = false;
+    return;
+  }
   if (event.button === 0 && isMouseDown) {
     isMouseDown = false;
     const dt = Date.now() - mouseDownTime;
@@ -1015,6 +1047,8 @@ document.addEventListener("mouseup", (event) => {
     isDragging = false;
   }
 });
+
+window.addEventListener("blur", () => stopWindowDrag());
 
 document.addEventListener("wheel", (e) => {
   e.preventDefault();

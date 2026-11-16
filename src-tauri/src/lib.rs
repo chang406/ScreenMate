@@ -1178,7 +1178,9 @@ pub fn run() {
             desktop::hide_to_tray,
             desktop::sync_tray_state,
             window_fit::report_character_zone,
-            window_fit::recenter_main
+            window_fit::recenter_main,
+            cursor_watcher::begin_drag,
+            cursor_watcher::end_drag
         ])
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } if window.label() == "settings" => {
