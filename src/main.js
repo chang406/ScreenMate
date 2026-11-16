@@ -254,23 +254,35 @@ const CONTEXTUAL_BUSY_SUBTITLES = {
   ]
 };
 
+/**
+ * 작업 중(busy) 대사 선택. 우선순위:
+ *  1) 캐릭터 전용 도구별 대사  busy.contextualSubtitles[detail]   (페르소나 + 지금 하는 일)
+ *  2) 공용 도구별 기본 대사    CONTEXTUAL_BUSY_SUBTITLES[detail]  (도구 구분이 있을 때, 캐릭터 대사가 없으면)
+ *  3) 캐릭터 일반 작업 대사    busy.subtitles                      (도구 구분이 없는 일반 작업)
+ *  4) 공용 일반 대사 / 기본 문구
+ * 새 캐릭터는 아무것도 넣지 않아도 2)·4)로 자동 동작하고, contextualSubtitles를 넣으면 1)로 더 풍부해진다.
+ */
 function getBusySubtitle(charDef, detail) {
+  const pick = (list) => list[Math.floor(Math.random() * list.length)];
   const resolved = resolveFallbackState(charDef, "busy");
-  // 1. 캐릭터 전용 도구별 맞춤 대사(edit/command/read/browse) 최우선 지원
-  if (detail && resolved?.def?.contextualSubtitles?.[detail]?.length > 0) {
-    const list = resolved.def.contextualSubtitles[detail];
-    return list[Math.floor(Math.random() * list.length)];
+  const busyDef = resolved?.def;
+
+  // 1) 캐릭터 전용 도구별 대사 (edit/command/read/browse/general)
+  const own = detail ? busyDef?.contextualSubtitles?.[detail] : null;
+  if (Array.isArray(own) && own.length > 0) return pick(own);
+
+  // 2) 도구 구분이 있으면 공용 도구별 기본 대사 ("general"은 도구 구분이 없는 것이므로 제외)
+  if (detail && detail !== "general" && CONTEXTUAL_BUSY_SUBTITLES[detail]) {
+    return pick(CONTEXTUAL_BUSY_SUBTITLES[detail]);
   }
-  // 2. 캐릭터 전용 일반 busy 대사
-  const subList = resolved?.def?.subtitles;
-  if (subList && subList.length > 0) {
-    return subList[Math.floor(Math.random() * subList.length)];
+
+  // 3) 캐릭터 일반 작업 대사 (페르소나 유지)
+  if (Array.isArray(busyDef?.subtitles) && busyDef.subtitles.length > 0) {
+    return pick(busyDef.subtitles);
   }
-  // 3. 캐릭터 맞춤 대사가 없을 때의 글로벌 기본 도구별 대사 폴백
-  if (detail && CONTEXTUAL_BUSY_SUBTITLES[detail]) {
-    const list = CONTEXTUAL_BUSY_SUBTITLES[detail];
-    return list[Math.floor(Math.random() * list.length)];
-  }
+
+  // 4) 공용 일반 대사 → 기본 문구
+  if (CONTEXTUAL_BUSY_SUBTITLES.general) return pick(CONTEXTUAL_BUSY_SUBTITLES.general);
   return "열심히 작업 중이에요! 🪄";
 }
 

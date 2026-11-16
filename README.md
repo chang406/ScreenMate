@@ -161,6 +161,8 @@ ScreenMate는 **폴더 기반 자체 완결형(Self-Contained Mod) 아키텍처*
 }
 ```
 
+> 🛠️ **작업 중 도구별 맞춤 대사 (선택)**: `busy` 상태(Live2D는 `reactions.busy`)에 `contextualSubtitles`를 넣으면 AI가 파일을 읽을 때(`read`), 고칠 때(`edit`), 명령을 실행할 때(`command`), 웹을 볼 때(`browse`) 각각 캐릭터 말투의 대사가 나옵니다. 없으면 공용 기본 대사가 자동으로 쓰입니다. 자세한 내용은 [`src/characters/custom_characters/README.md`](src/characters/custom_characters/README.md) 참고.
+
 ---
 
 ### 2️⃣ Live2D 모델 추가 예시

@@ -124,6 +124,7 @@ cargo build --release
 - **폴더 기반 자체 완결형(Self-Contained) 아키텍처**:
   - 각 캐릭터는 자신의 폴더 안에 모델/이미지 에셋과 `character.json` 설정 파일을 함께 보관합니다.
   - 앱 기동 시 Rust 백엔드가 `src/characters/` 및 `src/characters/custom_characters/` 디렉토리를 자동 스캔하여 런타임에 병합합니다.
+- **작업 중 도구별 대사 (`busy.contextualSubtitles`)**: 키는 세션 감시가 보내는 `detail` 값(`read`/`edit`/`command`/`browse`/`general`)과 같습니다. 선택 순서는 캐릭터 도구별 대사 → 공용 도구별 대사(`CONTEXTUAL_BUSY_SUBTITLES`) → 캐릭터 `busy.subtitles` → 공용 기본 문구입니다(`src/main.js` `getBusySubtitle`). 없어도 동작해야 하므로 필수 필드로 만들지 마십시오.
 - **공개/기본 캐릭터**: `src/characters/<캐릭터명>/`에 배치합니다 (`mao`, `wanko`, `pixel_cat` 등 라이선스 안전 에셋).
 - **개인 로컬 전용 커스텀 캐릭터 (Git 커밋 방지)**: `src/characters/custom_characters/<캐릭터명>/` 폴더에 에셋과 `character.json`을 함께 배치합니다. 이 디렉토리는 `.gitignore`로 보호되어 원격 저장소에 업로드되지 않습니다.
 - **최상단 `src/characters.json`**: 신규 사용자를 위한 공개 참조용 스키마 템플릿(가이드) 파일입니다.
